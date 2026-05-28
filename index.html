@@ -990,7 +990,8 @@ function vPD(){
 }
 
 function vPT(){
-  var p=curP(),teile=p.teile.slice(),totK=0;
+  var p=curP();if(!p)return "<div class=\"page\"><p class=\"empty\">Kein Projekt ausgewählt.</p></div>";
+  var teile=p.teile.slice(),totK=0;
   if(APP.pf)teile=teile.filter(function(t){return t.status===APP.pf;});
   if(APP.ps){var q=APP.ps.toLowerCase();teile=teile.filter(function(t){return(t.name+t.nr+t.gr+t.lief).toLowerCase().indexOf(q)>=0;});}
   for(var i=0;i<teile.length;i++)totK+=teile[i].kosten||0;
@@ -1363,11 +1364,13 @@ document.addEventListener("click",function(e){
       }
       return;
     }
+    // Befund condition click (check BEFORE moving to parent)
+    if(t&&t.getAttribute){
+      var bpid2=t.getAttribute("data-befpid");
+      var bcond2=t.getAttribute("data-beftcond");
+      if(bpid2&&bcond2){setBefCond(bpid2,parseInt(t.getAttribute("data-befidx")),bcond2);return;}
+    }
     t=t.parentElement;
-    // Befund condition click
-    var bpid=t.getAttribute&&t.getAttribute("data-befpid");
-    var bcond=t.getAttribute&&t.getAttribute("data-beftcond");
-    if(bpid&&bcond){setBefCond(bpid,parseInt(t.getAttribute("data-befidx")),bcond);return;}
   }
 });document.addEventListener("input",function(e){
   if(e.target&&e.target.id==="PSRCH"){APP.ps=e.target.value;render();return;}
