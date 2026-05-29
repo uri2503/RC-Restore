@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Riedel classics — Restauration Manager</title>
+<style>
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --red:#c41230;--dark:#1a1715;--bg:#f0ede8;--bg2:#e8e4de;--bg3:#dedad4;
+  --card:#fff;--text:#1a1715;--text2:#4a4540;--text3:#8a8278;
+  --green:#3d7a52;--green2:#5aaa72;--blue:#1a4a8a;--blue2:#2a6acc;
+  --teal:#0891b2;--purple:#7c3aed;--amber:#d97706;
+  --border:#d8d4ce;--border2:#c8c4bc;
+  --ff:"Georgia",serif;--fi:"Arial",sans-serif;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--fi);font-size:13px}
+.app{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--dark);position:fixed;top:0;left:0;bottom:0;overflow-y:auto;display:flex;flex-direction:column;z-index:50}
+.main{margin-left:220px;flex:1;min-height:100vh}
+.s-logo{padding:16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.s-logo img{width:100%;max-width:172px;display:block}
+.s-logo-sub{color:rgba(255,255,255,.35);font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-top:6px}
+.snav{flex:1;padding:8px 0}
+.nlbl{color:rgba(255,255,255,.3);font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:10px 15px 3px;font-weight:600}
+.ni{display:flex;align-items:center;gap:8px;padding:9px 15px;cursor:pointer;color:rgba(255,255,255,.55);border-left:3px solid transparent;font-size:12px}
+.ni:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.85)}
+.ni.active{background:linear-gradient(90deg,rgba(196,18,48,.15),transparent);color:#fff;border-left-color:var(--red)}
+.ni.active-teal{background:linear-gradient(90deg,rgba(8,145,178,.15),transparent);color:#fff;border-left-color:var(--teal)}
+.sbot{padding:10px;border-top:1px solid rgba(255,255,255,.06)}
+.sbot-btn{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);border-radius:5px;padding:7px;font-size:11px;cursor:pointer;margin-bottom:4px;font-family:var(--fi)}
+.sbot-btn:hover{background:rgba(255,255,255,.12);color:rgba(255,255,255,.8)}
+.page{padding:24px 28px}
+.pt{font-family:var(--ff);font-size:26px;font-weight:700;color:var(--text);margin-bottom:4px}
+.ps{font-size:12px;color:var(--text3);margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;border-top:3px solid var(--red);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.stat-teal{border-top-color:var(--teal)}
+.sv{font-family:var(--ff);font-size:26px;font-weight:700;color:var(--red)}
+.sl{font-size:10px;color:var(--text3);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.ss{font-size:11px;margin-top:6px;display:flex;gap:10px}
+.ss-p{color:var(--blue2)}.ss-t{color:var(--green2)}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:5px;border:none;cursor:pointer;font-family:var(--fi);font-size:12px;font-weight:500}
+.btn-p{background:var(--red);color:#fff}.btn-p:hover{opacity:.9}
+.btn-t{background:var(--teal);color:#fff}.btn-t:hover{opacity:.9}
+.btn-g{background:transparent;color:var(--text2);border:1px solid var(--border2)}.btn-g:hover{background:var(--bg2)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.bic{width:26px;height:26px;border-radius:4px;background:var(--bg);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.bic:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600}
+.b-red{background:#fde8ec;color:var(--red);border:1px solid rgba(196,18,48,.2)}
+.b-green{background:#e6f7ee;color:var(--green2);border:1px solid rgba(58,170,114,.2)}
+.b-gray{background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
+.b-blue{background:#e6f0fc;color:var(--blue2);border:1px solid rgba(42,106,204,.2)}
+.b-teal{background:#e0f7fa;color:var(--teal);border:1px solid rgba(8,145,178,.2)}
+.b-amber{background:#fff8e6;color:var(--amber);border:1px solid rgba(217,119,6,.2)}
+.b-purple{background:#f3e6fc;color:var(--purple);border:1px solid rgba(124,58,237,.2)}
+.ps0{background:#f5f5f5;color:#666;border:1px solid #ddd}
+.ps1{background:#fde8ec;color:var(--red);border:1px solid rgba(196,18,48,.2)}
+.ps2{background:#e6f0fc;color:var(--blue2);border:1px solid rgba(42,106,204,.2)}
+.ps3{background:#e8f4f8;color:#1a7a9a;border:1px solid rgba(26,122,154,.2)}
+.ps4{background:#f3e6fc;color:#7a2acc;border:1px solid rgba(122,42,204,.2)}
+.ps5{background:#fff8e6;color:#cc9200;border:1px solid rgba(204,146,0,.2)}
+.ps6{background:#e6f7ee;color:var(--green2);border:1px solid rgba(58,170,114,.2)}
+.ps7{background:#e8f0e8;color:#2a6a2a;border:1px solid rgba(42,106,42,.2)}
+.pg{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:4px}
+.pgb{height:100%;border-radius:3px}
+.pgb-red{background:linear-gradient(90deg,#8a0d22,var(--red))}
+.pgb-gr{background:linear-gradient(90deg,#1a5c38,var(--green2))}
+.pgb-tl{background:linear-gradient(90deg,#065f6c,var(--teal))}
+.pgb-ov{background:linear-gradient(90deg,#6a0808,#dd0000)}
+.flex{display:flex}.fac{align-items:center}.fjb{justify-content:space-between}.fwrap{flex-wrap:wrap}
+.g2p{gap:8px}.g3p{gap:12px}.g4p{gap:16px}
+.mt2{margin-top:8px}.mt3{margin-top:12px}.mt4{margin-top:16px}.mb2{margin-bottom:8px}.mb3{margin-bottom:12px}
+.fw{font-weight:600}.ff{font-family:var(--ff)}
+.cr{color:var(--red)}.cg{color:var(--green2)}.cb{color:var(--blue2)}.cm{color:var(--text3)}.ct{color:var(--teal)}
+.txs{font-size:10px}.tsm{font-size:11px}
+.divid{border:none;border-top:1px solid var(--border);margin:12px 0}
+.empty{text-align:center;padding:40px 20px;color:var(--text3)}
+.pc{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:8px;padding:16px;cursor:pointer;transition:box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.pc:hover{box-shadow:0 3px 12px rgba(0,0,0,.12)}
+.pc.planung{border-left-color:#aaa}.pc.pausiert{border-left-color:#888}.pc.abgeschlossen{border-left-color:var(--green2)}
+.vc{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.vc:hover{box-shadow:0 3px 12px rgba(0,0,0,.12)}
+.vcimg{height:130px;background:linear-gradient(135deg,var(--bg2),var(--bg3));display:flex;align-items:center;justify-content:center;font-size:40px;position:relative;overflow:hidden}
+.vcimg img{width:100%;height:100%;object-fit:cover}
+.vcb{padding:12px}
+.tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto}
+.tab{padding:9px 16px;cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.tab:hover{color:var(--text)}.tab.active{color:var(--red);border-bottom-color:var(--red)}
+.tab.active-t{color:var(--teal);border-bottom-color:var(--teal)}
+.tgroup{border:1px solid var(--border);border-radius:6px;margin:5px 0;overflow:hidden;background:var(--card)}
+.tgh{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg);cursor:pointer}
+.tgh:hover{background:var(--bg2)}.tgb{border-top:1px solid var(--border)}
+.titem{display:flex;align-items:center;gap:8px;padding:8px 12px 8px 24px;border-bottom:1px solid var(--bg)}
+.titem:last-child{border-bottom:none}.titem:hover{background:var(--bg)}
+.ttog{font-size:10px;color:var(--text3);width:12px;transition:transform .15s}
+.ttog.op{transform:rotate(90deg)}
+.dstep{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;margin:7px 0;position:relative}
+.dsnr{position:absolute;top:-8px;left:12px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px}
+.pgrid{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.pthumb{width:82px;height:62px;object-fit:cover;border-radius:5px;border:1px solid var(--border);cursor:pointer}
+.pupl{width:82px;height:62px;border:2px dashed var(--border2);border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);font-size:10px;position:relative}
+.pupl:hover{border-color:var(--red);color:var(--red)}
+.pupl input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.de{display:flex;gap:12px;margin:9px 0;position:relative}
+.de::before{content:"";position:absolute;left:13px;top:30px;bottom:-9px;width:1px;background:var(--border)}
+.ddot{width:26px;height:26px;border-radius:50%;background:var(--red);color:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;margin-top:3px;z-index:1}
+.ddot-t{background:var(--teal)}
+.dc{flex:1;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px}
+.pillg{display:flex;flex-wrap:wrap;gap:4px}
+.pill{padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg)}
+.pill:hover{border-color:var(--red);color:var(--red)}.pill.sel{background:var(--red);border-color:var(--red);color:#fff}
+.fg{margin-bottom:12px}
+.fl{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px;font-weight:600}
+.fi,.fsel,.fta{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px 10px;color:var(--text);font-family:var(--fi);font-size:12px;outline:none}
+.fi:focus,.fsel:focus,.fta:focus{border-color:var(--red)}
+.fsel{cursor:pointer}.fta{resize:vertical;min-height:70px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.twrap{overflow-x:auto;border-radius:6px;border:1px solid var(--border);background:var(--card)}
+table{width:100%;border-collapse:collapse}
+th{background:var(--bg);padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);border-bottom:1px solid var(--border)}
+td{padding:8px 12px;border-bottom:1px solid var(--bg);font-size:12px}
+tr:last-child td{border-bottom:none}tr:hover td{background:var(--bg)}
+tfoot td{background:var(--bg);font-weight:600}
+.movl{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--card);border-radius:10px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal-lg{max-width:820px}
+.mh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg)}
+.mht{font-family:var(--ff);font-size:18px;font-weight:700}
+.mb2{padding:20px}.mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.mcl{background:none;border:none;cursor:pointer;font-size:16px;color:var(--text3);padding:4px}
+.mcl:hover{color:var(--red)}
+.docthumb{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:5px}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:#fff;border-radius:6px;padding:10px 16px;font-size:12px;z-index:3000;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeup .2s ease}
+.toast-ok{background:#1a5c38}.toast-err{background:#8a0d22}
+@keyframes fadeup{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+/* ZEITERFASSUNG */
+.zt-row{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;background:var(--bg);margin-bottom:4px;border:1px solid var(--border);flex-wrap:wrap}
+.zt-date{font-size:11px;color:var(--teal);font-weight:600;white-space:nowrap;min-width:80px}
+.zt-time{font-size:11px;color:var(--text3);white-space:nowrap}
+.zt-dur{font-size:12px;color:var(--teal);font-weight:700;white-space:nowrap}
+.zt-proj{font-size:11px;color:var(--amber);background:#fff8e6;border-radius:4px;padding:2px 7px;border:1px solid rgba(217,119,6,.2)}
+.zt-pay{font-size:11px;color:var(--green2);font-weight:600}
+.zt-ma{font-size:11px;color:var(--purple);background:#f3e6fc;border-radius:4px;padding:2px 6px}
+.zt-note{font-size:11px;color:var(--text2);flex:1}
+.zt-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.zt-kpi{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;border-top:3px solid var(--teal)}
+.zt-kv{font-family:var(--ff);font-size:22px;font-weight:700;color:var(--teal)}
+.zt-kl{font-size:10px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px}
+.stamp-btn{width:80px;height:80px;border-radius:50%;border:2px solid;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:transform .1s;flex-shrink:0}
+.stamp-btn:active{transform:scale(0.95)}
+.timer-disp{font-size:40px;font-weight:800;letter-spacing:3px;color:var(--text);font-variant-numeric:tabular-nums;text-align:center;padding:12px 0}
+.smp-link-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:#e0f7fa;border:1px solid rgba(8,145,178,.25);border-radius:12px;font-size:11px;color:var(--teal);font-weight:600}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:700px){.sidebar{width:180px}.main{margin-left:180px}.g4{grid-template-columns:repeat(2,1fr)}}
+
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<div class="s-logo">
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAYQAAABkCAMAAACxULfXAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA/1pVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ1dWlkOjVEMjA4OTI0OTNCRkRCMTE5MTRBODU5MEQzMTUwOEM4IiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOkFCOTE0NkZBQUJDNTExRTVCRjJCOTIyRjI0N0NBNzA2IiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOkFCOTE0NkY5QUJDNTExRTVCRjJCOTIyRjI0N0NBNzA2IiB4bXA6Q3JlYXRvclRvb2w9IkFkb2JlIFBob3Rvc2hvcCBDUzYgKE1hY2ludG9zaCkiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpGOTdGMTE3NDA3MjA2ODExODIyQUVBMzQ2Q0EzREU4NCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDowMTgwMTE3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" alt="Riedel classics">
+  <div class="s-logo-sub">Restauration Manager</div><div id="sm-mn" style="color:rgba(255,255,255,.2);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-top:2px"></div>
+</div>
+<nav class="snav" id="SNAV">
+  <div class="nlbl">Restauration</div>
+  <div class="ni active" data-v="dashboard">&#9618; Dashboard</div>
+  <div class="ni" data-v="vehicles">&#128664; Fahrzeuge</div>
+  <div class="ni" data-v="projects">&#128203; Projekte</div>
+  <div class="ni" data-v="groups">&#128196; Gruppen</div>
+  <div id="PNAV" style="display:none">
+    <div class="nlbl">Aktives Projekt</div>
+    <div class="ni" data-v="po">&#9672; &#220;bersicht</div>
+    <div class="ni" data-v="pp">&#129504; Planung</div>
+    <div class="ni" data-v="pd">&#128297; Demontage</div>
+    <div class="ni" data-v="pt">&#9881; Ersatzteile</div>
+    <div class="ni" data-v="pb">&#128218; Tagebuch</div>
+    <div class="ni" data-v="pz">&#9203; Zeiterfassung</div>
+      <div class="ni" data-v="pbf">&#128203; Fahrzeugbefund</div>
+  </div>
+  <div class="nlbl">Zeiterfassung</div>
+  <div class="ni" data-v="zeit">&#9203; Stempeluhr</div>
+  <div class="ni" data-v="zeitliste">&#128203; Alle Zeiten</div>
+  <div class="ni" data-v="zeitrep">&#128196; Zeit-Berichte</div>
+  <div class="nlbl">System</div>
+  <div class="ni" data-v="reports">&#128196; Berichte</div>
+    <div onclick="navKZ()" style="display:flex;align-items:center;gap:8px;padding:9px 15px;cursor:pointer;color:rgba(255,255,255,.55);font-size:12px;border-left:3px solid transparent">&#128202; Kennzahlen &#128274;</div>
+  <div class="ni" data-v="settings">&#9881; Einstellungen</div>
+</nav>
+<div class="sbot">
+  <button class="sbot-btn" onclick="doLogout()" style="background:rgba(196,18,48,.18);border-color:rgba(196,18,48,.3);color:rgba(255,100,100,.7)">&#128274; Abmelden</button>
+  <button class="sbot-btn" id="BTN-EXP">&#128229; Vollbackup</button>
+  <button class="sbot-btn" id="BTN-IMP">&#128228; Restore</button>
+  <input type="file" id="IMP-FILE" accept=".json" style="display:none">
+  <div style="color:rgba(255,255,255,.2);font-size:10px;text-align:center;margin-top:4px">Riedel classics v3.0</div>
+</div>
+</aside>
+<main class="main" id="MC" style="padding:24px 28px">
+  <div style="color:var(--text3);font-size:14px">Wird geladen&hellip;</div>
+</main>
+</div>
+<div id="MOD"></div>
+<div id="TOAST"></div>
+<div id="LOGIN" style="position:fixed;inset:0;background:#1a1715;z-index:9999;display:none;align-items:center;justify-content:center"><div style="background:#111;border:1px solid rgba(196,18,48,.3);border-radius:14px;padding:36px 32px;width:320px;text-align:center"><img id="login-logo" src="" style="width:180px;display:block;margin:0 auto 14px"><div id="login-mandant" style="color:rgba(255,255,255,.3);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px"></div><div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:16px">Passwort eingeben</div><input type="password" id="login-pw" placeholder="••••••••" style="width:100%;background:#1a1715;border:1px solid rgba(196,18,48,.3);border-radius:8px;color:#fff;padding:12px 14px;font-size:16px;text-align:center;outline:none;margin-bottom:10px"><button onclick="doLogin()" style="width:100%;background:#c41230;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">Entsperren</button><div id="login-err" style="color:#f87171;font-size:12px;height:16px;margin-top:8px"></div></div></div>
+<script>
+
+// ── UTILS ─────────────────────────────────────────────────────────
+var E = function(id){return document.getElementById(id);};
+var FMT = function(n){return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n||0);};
+var FMTH = function(h){h=parseFloat(h)||0;return Math.floor(h)+"h "+(Math.round((h%1)*60)||0)+"min";};
+var FMTD = function(d){if(!d)return"\u2014";var p=d.split("-");return p[2]+"."+p[1]+"."+p[0];};
+var UID = function(){return Math.random().toString(36).slice(2,9);};
+var PCT = function(a,b){return b>0?Math.min(Math.round(a/b*100),999):0;};
+var CL = function(v,a,b){return Math.max(a,Math.min(b,v));};
+var GV = function(id){var el=E(id);return el?el.value:"";};
+var GF = function(id){return parseFloat(GV(id))||0;};
+var GI = function(id){return parseInt(GV(id))||0;};
+var TODAY = function(){return new Date().toISOString().split("T")[0];};
+var FMT_EUR = function(n){return "\u20ac"+(parseFloat(n)||0).toFixed(2).replace(".",",");};
+var FMT_DUR = function(ms){var h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);return (h>0?h+"h ":"")+(m>0?m+"min":"<1min");};
+var FMT_DUR_SHORT = function(ms){var m=Math.floor(ms/60000),h=Math.floor(m/60);return (h<10?"0":"")+h+":"+(m%60<10?"0":"")+m%60;};
+
+function toast(msg,type){
+  var t=E("TOAST"),el=document.createElement("div");
+  el.className="toast"+(type==="err"?" toast-err":type==="ok"?" toast-ok":"");
+  el.textContent=msg;t.appendChild(el);
+  setTimeout(function(){el.remove();},2800);
+}
+function pgbar(a,b,cls){
+  var p=PCT(a,b),c=p>100?"pgb-ov":(cls||"pgb-red");
+  return "<div class=\"pg\"><div class=\"pgb "+c+"\" style=\"width:"+CL(p,0,100)+"%\"></div></div>"
+    +"<div class=\"txs cm\" style=\"margin-top:2px\">"+p+"% ("+FMT(a)+" / "+FMT(b)+")</div>";
+}
+
+// ── DATA STRUCTURES ────────────────────────────────────────────────
+var PST=[
+  {v:"s0",l:"Identifiziert",c:"ps0",i:"?"},
+  {v:"s1",l:"Instandsetzung intern",c:"ps1",i:"\u2692"},
+  {v:"s2",l:"Neuteil Beschaffung",c:"ps2",i:"\u25B6"},
+  {v:"s3",l:"Bestellt",c:"ps3",i:"\u25A0"},
+  {v:"s4",l:"\u00dcberarbeitung extern",c:"ps4",i:"\u25C6"},
+  {v:"s5",l:"Lackierung",c:"ps5",i:"\u25CB"},
+  {v:"s6",l:"Einbaubereit",c:"ps6",i:"\u2714"},
+  {v:"s7",l:"Eingebaut",c:"ps7",i:"\u2605"}
+];
+var PJST=["Aktiv","Planung","Pausiert","Abgeschlossen"];
+var PLST=["Geplant","In Arbeit","Fertig","Problem"];
+var BEREICHE=["Motor","Karosserie","Interieur","Fahrwerk","Elektrik","Getriebe","Auspuff","Achse","K\u00fchlsystem","Sonstiges"];
+
+var APP={view:"dashboard",pid:null,pf:"",ps:"",zFilter:"",zSearch:"",data:{
+  vehicles:[
+    {id:"v1",marke:"Mercedes-Benz",modell:"300 SL",baujahr:1955,fnr:"198.040.5500012",kz:"MB-SL 300",farbe:"Silber",status:"In Restauration",km:48200,info:"Legend\u00e4rer Fl\u00fcgelt\u00fcrer.",bild:[],untB:[],untA:[],dok:[],smpProj:""},
+    {id:"v2",marke:"Porsche",modell:"356 Speedster",baujahr:1958,fnr:"83642",kz:"P-356-58",farbe:"Rubinrot",status:"Fahrbereit",km:62400,info:"Sehr guter Originalzustand.",bild:[],untB:[],untA:[],dok:[],smpProj:""}
+  ],
+  projects:[{
+    id:"p1",vid:"v1",name:"Vollrestaurierung 300 SL",info:"Komplette Restaurierung nach Concours-Standard.",
+    start:"2024-03-15",ende:"2026-12-31",status:"Aktiv",planK:85000,planZ:2400,ss:90,
+    smpProj:"Ralf H\u00f6ckel / W111 300 SE K\u00f6nigsflosse",
+    gruppen:[
+      {id:"g1",name:"Karosserie",col:false,planK:28000,planZ:750,items:[
+        {id:"i1",name:"T\u00fcren",zustand:"Rost Unterkante",planK:9500,planZ:220,istK:0,istZ:0,status:"Geplant",bem:""},
+        {id:"i2",name:"Kotfl\u00fcgel vorne",zustand:"Leichte Dellen",planK:4200,planZ:90,istK:0,istZ:0,status:"Geplant",bem:""},
+        {id:"i3",name:"Motorhaube",zustand:"Lacksch\u00e4den",planK:2800,planZ:60,istK:2800,istZ:60,status:"Fertig",bem:"Abgeschlossen"}
+      ]},
+      {id:"g2",name:"Motor",col:false,planK:32000,planZ:850,items:[
+        {id:"i4",name:"Reihenmotor 3,0L",zustand:"L\u00e4uft, \u00f6lt",planK:18000,planZ:400,istK:9200,istZ:210,status:"In Arbeit",bem:"Kompressor erneuert"},
+        {id:"i5",name:"Getriebe",zustand:"Schaltet schwer",planK:5500,planZ:120,istK:0,istZ:0,status:"Geplant",bem:""}
+      ]},
+      {id:"g3",name:"Interieur",col:true,planK:14000,planZ:480,items:[
+        {id:"i7",name:"Sitze",zustand:"Stark abgenutzt",planK:6800,planZ:200,istK:0,istZ:0,status:"Geplant",bem:""}
+      ]}
+    ],
+    demontage:[
+      {id:"d1",nr:1,bereich:"Motor",titel:"Motorvorbereitung",info:"Kraftstoff entleert.",datum:"2024-04-02",status:"Fertig",bilder:[]},
+      {id:"d2",nr:2,bereich:"Motor",titel:"Motor ausgebaut",info:"Motor mit Hebezeug ausgebaut.",datum:"2024-04-10",status:"Fertig",bilder:[]},
+      {id:"d3",nr:3,bereich:"Interieur",titel:"Interieur Ausbau",info:"Sitze und Teppiche ausgebaut.",datum:"2024-06-01",status:"In Arbeit",bilder:[]}
+    ],
+    teile:[
+      {id:"t1",nr:"M-001",name:"Zylinderkopfdichtung",gr:"Motor",menge:1,status:"s7",lief:"Mercedes Classic",kosten:480,notiz:"Eingebaut",bilder:[]},
+      {id:"t2",nr:"M-002",name:"Kolbenringe",gr:"Motor",menge:6,status:"s6",lief:"Mahle",kosten:320,notiz:"Lager",bilder:[]},
+      {id:"t3",nr:"M-003",name:"Kurbelwellenlager",gr:"Motor",menge:7,status:"s3",lief:"SKF",kosten:895,notiz:"Bestellt",bilder:[]},
+      {id:"t4",nr:"K-001",name:"Kotfl\u00fcgel links",gr:"Karosserie",menge:1,status:"s4",lief:"Blecherei M\u00fcller",kosten:2800,notiz:"Bei M\u00fcller",bilder:[]},
+      {id:"t5",nr:"E-001",name:"Tacho 0-300",gr:"Elektrik",menge:1,status:"s1",lief:"Bauer",kosten:650,notiz:"Revision",bilder:[]}
+    ],
+    tagebuch:[
+      {id:"b1",datum:"2024-06-12",zeit:3.5,info:"Motorreinigung abgeschlossen.",kosten:0,bilder:[]},
+      {id:"b2",datum:"2024-05-28",zeit:6,info:"Blechbesprechung Karosseriebetrieb.",kosten:180,bilder:[]},
+      {id:"b3",datum:"2024-04-10",zeit:8,info:"Motor erfolgreich ausgebaut!",kosten:0,bilder:[]}
+    ]
+  }],
+  arbeitsgaenge:[{name:"Mechanik",rolle:"Kfz-Meister",rate:109},{name:"Lackierung",rolle:"Lackierer",rate:149},{name:"Schleifarbeiten",rolle:"Karosserie",rate:109},{name:"Innenausbau",rolle:"Polsterer",rate:95}],
+  mitarbeiter:[],
+  gruppenVorlagen:[
+    {id:"gv1",name:"Motor"},{id:"gv2",name:"Karosserie"},{id:"gv3",name:"Antrieb"},
+    {id:"gv4",name:"Achse"},{id:"gv5",name:"Elektrik"},{id:"gv6",name:"Interieur"},
+    {id:"gv7",name:"Fahrwerk"},{id:"gv8",name:"Getriebe"},{id:"gv9",name:"Bremsen"},
+    {id:"gv10",name:"K\u00fchlsystem"},{id:"gv11",name:"Auspuff"},{id:"gv12",name:"Lackierung"}
+  ],
+  settings:{password:"1234",ss:90,kpPin:"0000",miete:0,strom:0,agk:0}
+},
+smp:{
+  zeit:[],
+  kundenprojekte:[],
+  arbeitsgaenge:[],
+  mitarbeiter:[]
+}};
+
+// ── MANDANT ──────────────────────────────────────────────────────
+var MANDANT=(function(){
+  try{var p=new URLSearchParams(window.location.search);
+    var m=(p.get("mandant")||p.get("m")||"default").toLowerCase();
+    return m.replace(/[^a-z0-9_-]/g,"")||"default";
+  }catch(e){return"default";}
+})();
+var CR_KEY="cr_v3_"+MANDANT;
+var SMP_KEY="smp_v4_"+MANDANT;
+
+// ── LOCALSTORAGE ───────────────────────────────────────────────────
+var SAVE_T;
+function saveData(){
+  try{
+    var crJson=JSON.stringify(APP.data);
+    localStorage.setItem(CR_KEY,crJson);
+    var sf={zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[],kw:[],proj:[],auf:[],id:[]};
+    localStorage.setItem(SMP_KEY,JSON.stringify(sf));
+    localStorage.setItem(CR_KEY+"_ts",new Date().toISOString());
+    console.log("Saved: CR="+Math.round(crJson.length/1024)+"KB, Zeit="+APP.smp.zeit.length);
+  }catch(e){console.error("Save FAILED:",e);toast("Speicherfehler: "+e.message,"err");}
+}
+function loadData(){
+  try{
+    var smp=localStorage.getItem(SMP_KEY);
+    if(smp){var s=JSON.parse(smp);
+      if(s.zeit&&Array.isArray(s.zeit))APP.smp.zeit=s.zeit;
+      if(s.kundenprojekte&&Array.isArray(s.kundenprojekte))APP.smp.kundenprojekte=s.kundenprojekte;
+      if(s.arbeitsgaenge&&Array.isArray(s.arbeitsgaenge))APP.smp.arbeitsgaenge=s.arbeitsgaenge;
+      if(s.mitarbeiter&&Array.isArray(s.mitarbeiter))APP.smp.mitarbeiter=s.mitarbeiter;}
+    var cr=localStorage.getItem(CR_KEY);
+    if(cr){var d=JSON.parse(cr);
+      if(d&&d.vehicles){
+        APP.data.vehicles=d.vehicles||[];APP.data.projects=d.projects||[];
+        APP.data.gruppenVorlagen=d.gruppenVorlagen||APP.data.gruppenVorlagen;
+        APP.data.settings=d.settings||APP.data.settings;
+        if(!APP.data.arbeitsgaenge&&d.arbeitsgaenge)APP.data.arbeitsgaenge=d.arbeitsgaenge;
+        if(!APP.data.mitarbeiter&&d.mitarbeiter)APP.data.mitarbeiter=d.mitarbeiter;
+        for(var i=0;i<APP.data.vehicles.length;i++){var v=APP.data.vehicles[i];
+          if(!v.bild)v.bild=[];if(!v.untB)v.untB=[];if(!v.untA)v.untA=[];if(!v.dok)v.dok=[];if(!v.smpProj)v.smpProj="";}
+        for(var i=0;i<APP.data.projects.length;i++){var p=APP.data.projects[i];
+          if(!p.smpProj)p.smpProj="";if(!p.ss)p.ss=APP.data.settings.ss||90;
+          if(!p.teile)p.teile=[];if(!p.tagebuch)p.tagebuch=[];if(!p.demontage)p.demontage=[];if(!p.gruppen)p.gruppen=[];}
+        if(cr.length>2048*1024){console.warn("Bloated CR - cleaning...");cleanStorage();}}}
+    console.log("Loaded: "+APP.data.projects.length+" Projekte, "+APP.smp.zeit.length+" Zeiteintraege");
+  }catch(e){console.error("loadData:",e);}
+}
+
+function D(){return APP.data;}
+function getV(id){for(var i=0;i<D().vehicles.length;i++)if(D().vehicles[i].id===id)return D().vehicles[i];return null;}
+function getP(id){for(var i=0;i<D().projects.length;i++)if(D().projects[i].id===id)return D().projects[i];return null;}
+function curP(){return getP(APP.pid);}
+
+// SMP Zeiterfassung entries for a project
+function getSMPTime(smpProj){
+  if(!smpProj||!APP.smp||!APP.smp.zeit)return[];
+  return APP.smp.zeit.filter(function(e){
+    if(!e.proj)return false;
+    if(e.proj===smpProj)return true;
+    var d2=D().projects;
+    for(var i=0;i<d2.length;i++){var p2=d2[i];if(p2.smpProj===smpProj||p2.name===smpProj){if(e.proj===p2.name||(p2.smpProj&&e.proj===p2.smpProj))return true;}}
+    return false;
+  });
+}
+
+function getSMPTimeH(smpProj){
+  var entries=getSMPTime(smpProj),h=0;
+  for(var i=0;i<entries.length;i++)h+=(entries[i].dur||0)/3600000;
+  return h;
+}
+
+function costs(p){
+  var pk=0,thCR=0,thSMP=0;
+  var _tl=p.teile||[],_tb=p.tagebuch||[];
+  for(var i=0;i<_tl.length;i++)pk+=_tl[i].kosten||0;
+  for(var i=0;i<_tb.length;i++)thCR+=parseFloat(_tb[i].zeit)||0;
+  var smpKey=p.smpProj||p.name;if(smpKey)thSMP=getSMPTimeH(smpKey);
+  var th=thCR+thSMP;
+  var rate=p.ss||D().settings.ss||90;
+  var tk=th*rate;
+  return{pk:pk,thCR:thCR,thSMP:thSMP,th:th,tk:tk,tot:pk+tk,rate:rate};
+}
+
+// ── BADGES ────────────────────────────────────────────────────────
+function badge(cls,txt){return "<span class=\"badge "+cls+"\">"+txt+"</span>";}
+function pjb(s){var m={Aktiv:"b-red",Planung:"b-gray",Pausiert:"b-gray",Abgeschlossen:"b-green"};return badge(m[s]||"b-gray",s);}
+function plb(s){var m={Geplant:"b-gray","In Arbeit":"b-blue",Fertig:"b-green",Problem:"b-red"};return badge(m[s]||"b-gray",s);}
+function psb(s){var x={l:s,c:"ps0"};for(var i=0;i<PST.length;i++)if(PST[i].v===s){x=PST[i];break;}return badge(x.c,x.i+" "+x.l);}
+function dot(s){var c={Fertig:"var(--green2)","In Arbeit":"#cc9200",Geplant:"var(--text3)",Problem:"var(--red)"}[s]||"var(--text3)";return "<span style=\"width:7px;height:7px;border-radius:50%;background:"+c+";display:inline-block;flex-shrink:0\"></span>";}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────
+function nav(view,pid){
+  if(pid!==undefined&&pid!=="")APP.pid=pid;
+  APP.view=view;
+  var items=document.querySelectorAll(".ni");
+  var zeitViews=["zeit","zeitliste","zeitrep","pz"];
+  for(var i=0;i<items.length;i++){
+    var dv=items[i].getAttribute("data-v");
+    items[i].classList.remove("active","active-teal");
+    if(dv===view){
+      items[i].classList.add(zeitViews.indexOf(view)>=0?"active-teal":"active");
+    }
+  }
+  E("PNAV").style.display=APP.pid?"block":"none";
+  render();
+}
+function render(){
+  var mc=E("MC");
+  if(!mc)return;
+  try{
+    var fn={"dashboard":vDash,"vehicles":vVeh,"projects":vProj,"groups":vGrp,
+            "po":vPO,"pp":vPP,"pd":vPD,"pt":vPT,"pb":vPB,"pz":vPZ,"pbf":vPBF,
+            "zeit":vZeit,"zeitliste":vZeitListe,"zeitrep":vZeitRep,
+            "kennzahlen":vKZ,"reports":vRep,"settings":vSet}[APP.view];
+    mc.innerHTML=fn?fn():"<div class=\"page\"><p>Nicht gefunden</p></div>";
+    if(APP.view==="reports")setTimeout(renderRepAnalyse,80);
+    if(APP.view==="settings")setTimeout(checkStorageUsage,100);
+    if(APP.view==="zeit")checkStampTimer();
+  }catch(ex){
+    mc.innerHTML="<div class=\"page\"><div style=\"background:#fde8ec;border:1px solid rgba(196,18,48,.3);border-radius:8px;padding:16px;font-family:monospace;font-size:11px;color:var(--red)\"><strong>Fehler:</strong> "+ex.message+"<br><br>"+ex.stack+"</div></div>";
+  }
+}
+
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
+function vDash(){
+  var d=D();if(!d.vehicles)d.vehicles=[];if(!d.projects)d.projects=[];var aktiv=0,totPK=0,totTK=0,allT=0,ein=0;
+  var totSMPH=0,totSMPPay=0;
+  for(var i=0;i<d.projects.length;i++){
+    var p=d.projects[i];var c=costs(p);
+    if(p.status==="Aktiv")aktiv++;
+    totPK+=c.pk;totTK+=c.tk;allT+=p.teile.length;
+    totSMPH+=c.thSMP;
+    for(var j=0;j<p.teile.length;j++)if(p.teile[j].status==="s7")ein++;
+  }
+  // Total SMP pay
+  for(var i=0;i<APP.smp.zeit.length;i++)totSMPPay+=parseFloat(APP.smp.zeit[i].pay)||0;
+  var pc="";
+  for(var i=0;i<d.projects.length&&i<4;i++){
+    var p=d.projects[i],v=getV(p.vid),c=costs(p);
+    var smpBadge=p.smpProj?"<span class=\"smp-link-badge\">&#9203; "+p.smpProj.split(" / ").pop()+"</span>":"";
+    pc+="<div class=\"pc "+p.status.toLowerCase()+"\" data-action=\"navp\" data-id=\"po\" data-id2=\""+p.id+"\" style=\"margin-bottom:10px\">"
+      +"<div class=\"flex fac fjb mb2\"><div><div class=\"ff fw\" style=\"font-size:14px\">"+p.name+"</div>"
+      +"<div class=\"txs cm\">"+(v?v.marke+" "+v.modell:"")+"</div>"
+      +(p.smpProj?smpBadge:"")+"</div>"+pjb(p.status)+"</div>"
+      +"<div class=\"tsm flex g4p mb2\">"
+      +"<span class=\"cb\">Teile: "+FMT(c.pk)+"</span>"
+      +"<span class=\"cg\">Zeit CR: "+FMTH(c.thCR)+"</span>"
+      +(c.thSMP>0?"<span class=\"ct\">&#9203; SMP: "+FMTH(c.thSMP)+"</span>":"")
+      +"<span class=\"cm\">Plan: "+FMT(p.planK)+"</span></div>"
+      +pgbar(c.tot,p.planK,"")+"</div>";
+  }
+  var sr="";
+  for(var i=0;i<PST.length;i++){
+    var ps=PST[i],cnt=0;
+    for(var j=0;j<d.projects.length;j++)for(var k=0;k<d.projects[j].teile.length;k++)if(d.projects[j].teile[k].status===ps.v)cnt++;
+    if(cnt>0)sr+="<div class=\"flex fac fjb\" style=\"padding:5px 0;border-bottom:1px solid var(--bg3)\">"+badge(ps.c,ps.i+" "+ps.l)+"<span class=\"ff fw\" style=\"font-size:15px\">"+cnt+"</span></div>";
+  }
+  return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div><div class=\"pt\">Dashboard</div>"
+    +"<div class=\"ps\">"+d.projects.length+" Projekte &bull; "+d.vehicles.length+" Fahrzeuge &bull; "
+    +(APP.smp.zeit.length>0?APP.smp.zeit.length+" Zeiteintr\u00e4ge aus Stempeluhr":"Keine Stempeluhr-Daten")+"</div></div></div>"
+    +"<div class=\"g4\">"
+    +"<div class=\"stat\"><div class=\"sv\">"+d.vehicles.length+"</div><div class=\"sl\">Fahrzeuge</div></div>"
+    +"<div class=\"stat\"><div class=\"sv\">"+aktiv+"</div><div class=\"sl\">Aktive Projekte</div></div>"
+    +"<div class=\"stat\"><div class=\"sv\">"+FMT(totPK+totTK)+"</div><div class=\"sl\">Projektkosten gesamt</div>"
+    +"<div class=\"ss\"><span class=\"ss-p\">Teile: "+FMT(totPK)+"</span><span class=\"ss-t\">Zeit: "+FMT(totTK)+"</span></div></div>"
+    +"<div class=\"stat stat-teal\"><div class=\"sv ct\">"+FMTH(totSMPH)+"</div><div class=\"sl\">Zeit aus Stempeluhr</div>"
+    +"<div class=\"ss\"><span class=\"ct\">&#9203; "+APP.smp.zeit.length+" Eintr\u00e4ge &bull; "+FMT_EUR(totSMPPay)+"</span></div></div>"
+    +"</div>"
+    +"<div class=\"g2\">"
+    +"<div><div class=\"flex fac fjb mb3\"><div class=\"ff\" style=\"font-size:15px;font-weight:700\">Aktive Projekte</div>"
+    +"<button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"projects\">Alle &rarr;</button></div>"
+    +(pc||"<p class=\"cm txs\">Keine Projekte.</p>")+"</div>"
+    +"<div><div class=\"ff\" style=\"font-size:15px;font-weight:700;margin-bottom:12px\">Ersatzteile &mdash; Status</div>"
+    +"<div class=\"card\">"+(sr||"<p class=\"cm txs\" style=\"padding:8px\">Keine Teile.</p>")+"</div></div></div></div>";
+}
+
+// ── VEHICLES (compact) ─────────────────────────────────────────────
+function vVeh(){
+  var d=D();if(!d.vehicles)d.vehicles=[];var cards="";
+  for(var i=0;i<d.vehicles.length;i++){
+    var v=d.vehicles[i],pr=0;
+    for(var j=0;j<d.projects.length;j++)if(d.projects[j].vid===v.id)pr++;
+    cards+="<div class=\"vc\"><div class=\"vcimg\">"+(v.bild&&v.bild.length?"<img src=\""+v.bild[0].src+"\" alt=\"\">"
+      :"<span>&#128664;</span>")+"<div style=\"position:absolute;top:7px;right:7px\">"+pjb(v.status)+"</div>"
+      +(v.bild&&v.bild.length>1?"<div style=\"position:absolute;bottom:6px;left:7px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;padding:2px 6px;border-radius:3px\">&#128247; "+v.bild.length+"</div>":"")
+      +(v.dok&&v.dok.length?"<div style=\"position:absolute;bottom:6px;right:7px;background:rgba(196,18,48,.8);color:#fff;font-size:10px;padding:2px 6px;border-radius:3px\">&#128196; "+v.dok.length+"</div>":"")
+      +"</div>"
+      +"<div class=\"vcb\"><div class=\"ff fw\" style=\"font-size:15px\">"+v.marke+" "+v.modell+"</div>"
+      +"<div class=\"txs cm\">Bj. "+v.baujahr+" &bull; "+v.farbe+" &bull; "+(v.km||0).toLocaleString("de-DE")+" km</div>"
+      +"<div class=\"txs cm\">FNr: "+v.fnr+(v.kz?" &bull; "+v.kz:"")+"</div>"
+      +(v.info?"<div class=\"txs cm mt2\">"+v.info.slice(0,75)+"</div>":"")
+      +"<div class=\"flex fac fjb mt3\"><span class=\"txs cm\">"+pr+" Projekte</span>"
+      +"<div class=\"flex g2p\"><button class=\"bic\" data-action=\"openVM\" data-id=\""+v.id+"\">&#9998;</button>"
+      +"<button class=\"bic\" data-action=\"delV\" data-id=\""+v.id+"\">&#128465;</button></div></div></div></div>";
+  }
+  return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div><div class=\"pt\">Fahrzeuge</div></div>"
+    +"<button class=\"btn btn-p\" data-action=\"openVM\">+ Fahrzeug</button></div>"
+    +(cards?"<div class=\"g3\">"+cards+"</div>":"<div class=\"empty\"><p>Keine Fahrzeuge</p></div>")+"</div>";
+}
+
+// ── PROJECTS ──────────────────────────────────────────────────────
+function vProj(){
+  var d=D(),cards="";
+  for(var i=0;i<d.projects.length;i++){
+    var p=d.projects[i],v=getV(p.vid),c=costs(p);
+    cards+="<div class=\"pc "+p.status.toLowerCase()+"\" data-action=\"navp\" data-id=\"po\" data-id2=\""+p.id+"\">"
+      +"<div class=\"flex fac fjb mb2\"><div><div class=\"ff fw\" style=\"font-size:16px\">"+p.name+"</div>"
+      +"<div class=\"txs cm\">"+(v?v.marke+" "+v.modell+" ("+v.baujahr+")":"")+"</div>"
+      +(p.smpProj?"<div class=\"smp-link-badge\" style=\"margin-top:4px\">&#9203; "+p.smpProj+"</div>":"")
+      +"</div>"
+      +"<div class=\"flex g2p fac\">"+pjb(p.status)
+      +"<button class=\"bic\" data-action=\"openPM\" data-id=\""+p.id+"\">&#9998;</button>"
+      +"<button class=\"bic\" data-action=\"delPrj\" data-id=\""+p.id+"\">&#128465;</button></div></div>"
+      +"<div class=\"tsm cm mb2\">"+p.info.slice(0,90)+"</div>"
+      +"<div class=\"tsm flex g4p mb2\">"
+      +"<span class=\"cb\">Teile: "+FMT(c.pk)+"</span>"
+      +"<span class=\"cg\">Zeit CR: "+FMTH(c.thCR)+"</span>"
+      +(c.thSMP>0?"<span class=\"ct\">&#9203; SMP: "+FMTH(c.thSMP)+"</span>":"")
+      +"<span class=\"cm\">Plan: "+FMT(p.planK)+"</span></div>"
+      +pgbar(c.tot,p.planK,"")
+      +"<div class=\"flex g3p txs cm mt2\" style=\"border-top:1px solid var(--border);padding-top:7px\">"
+      +"<span>&#128197; "+FMTD(p.start)+" &ndash; "+FMTD(p.ende)+"</span>"
+      +"<span>&#9881; "+p.teile.length+" Teile</span>"
+      +"<span>&#9203; "+(c.thSMP>0?FMTH(c.thSMP)+" SMP":"Kein SMP-Link")+"</span></div></div>";
+  }
+  return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div><div class=\"pt\">Projekte</div></div>"
+    +"<button class=\"btn btn-p\" data-action=\"openPM\">+ Projekt</button></div>"
+    +(cards?"<div style=\"display:flex;flex-direction:column;gap:12px\">"+cards+"</div>"
+    :"<div class=\"empty\"><p>Keine Projekte</p></div>")+"</div>";
+}
+
+function vGrp(){
+  var d=D(),rows="";
+  for(var i=0;i<(d.gruppenVorlagen||[]).length;i++){
+    var g=d.gruppenVorlagen[i];
+    rows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)\"><span class=\"ff\" style=\"flex:1;font-size:13px\">"+g.name+"</span>"
+      +"<button class=\"bic\" data-action=\"editGV\" data-id=\""+g.id+"\">&#9998;</button>&nbsp;"
+      +"<button class=\"bic\" data-action=\"delGV\" data-id=\""+g.id+"\">&#128465;</button></div>";
+  }
+  return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div><div class=\"pt\">Gruppen-Vorlagen</div></div>"
+    +"<button class=\"btn btn-p\" data-action=\"editGV\">+ Gruppe</button></div>"
+    +"<div class=\"card\">"+rows+"</div></div>";
+}
+
+// ── PROJECT HEADER ─────────────────────────────────────────────────
+function pH(a){
+  var p=curP(),v=getV(p.vid);
+  return "<div class=\"page\"><div style=\"margin-bottom:12px\"><div class=\"flex fac g3p mb2\">"
+    +"<button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"projects\">&larr; Projekte</button>"+pjb(p.status)
+    +(p.smpProj?"<span class=\"smp-link-badge\">&#9203; "+p.smpProj+"</span>":"")+"</div>"
+    +"<div class=\"pt\">"+p.name+"</div>"
+    +"<div class=\"ps\">"+(v?v.marke+" "+v.modell+" &bull; "+v.baujahr:"")+" &bull; "+FMTD(p.start)+" &ndash; "+FMTD(p.ende)+"</div></div>"
+    +"<div class=\"tabs\">"
+    +"<div class=\"tab"+(a==="o"?" active":"")+"\" data-action=\"nav\" data-id=\"po\">&Uuml;bersicht</div>"
+    +"<div class=\"tab"+(a==="p"?" active":"")+"\" data-action=\"nav\" data-id=\"pp\">Planung</div>"
+    +"<div class=\"tab"+(a==="d"?" active":"")+"\" data-action=\"nav\" data-id=\"pd\">Demontage</div>"
+    +"<div class=\"tab"+(a==="t"?" active":"")+"\" data-action=\"nav\" data-id=\"pt\">Ersatzteile</div>"
+    +"<div class=\"tab"+(a==="b"?" active":"")+"\" data-action=\"nav\" data-id=\"pb\">Tagebuch</div>"
+    +"<div class=\"tab"+(a==="z"?" active active-t":"")+"\" data-action=\"nav\" data-id=\"pz\">&#9203; Zeiterfassung</div>"
+    +"<div class=\"tab"+(a==="f"?" active active-t":"")+"\" data-action=\"nav\" data-id=\"pbf\">&#128203; Fahrzeugbefund</div>"
+    +"</div>";
+}
+
+// ── PROJECT OVERVIEW ───────────────────────────────────────────────
+function vPO(){
+  var p=curP(),c=costs(p),ai=0,fi=0,ein=0;
+  for(var i=0;i<p.gruppen.length;i++){ai+=p.gruppen[i].items.length;for(var j=0;j<p.gruppen[i].items.length;j++)if(p.gruppen[i].items[j].status==="Fertig")fi++;}
+  for(var i=0;i<p.teile.length;i++)if(p.teile[i].status==="s7")ein++;
+  var sr="";
+  for(var i=0;i<PST.length;i++){var ps=PST[i],cnt=0;for(var j=0;j<p.teile.length;j++)if(p.teile[j].status===ps.v)cnt++;if(cnt>0)sr+=badge(ps.c,ps.i+" "+ps.l)+" <strong>"+cnt+"</strong>&nbsp;&nbsp;";}
+  var re="";var tb=p.tagebuch.slice().sort(function(a,b){return b.datum.localeCompare(a.datum);});
+  for(var i=0;i<tb.length&&i<3;i++){var e=tb[i];re+="<div style=\"border-left:3px solid var(--red);padding:6px 10px;margin-bottom:7px;background:var(--bg);border-radius:0 5px 5px 0\"><div class=\"txs cm\">"+FMTD(e.datum)+(e.zeit?" &bull; "+FMTH(e.zeit):"")+"</div><div class=\"tsm mt2\">"+e.info.slice(0,80)+"</div></div>";}
+  // SMP recent entries for this project
+  var smpEntries=p.smpProj?getSMPTime(p.smpProj).slice(-3):[],smpRe="";
+  smpEntries.sort(function(a,b){return b.date>a.date?1:-1;});
+  for(var i=0;i<smpEntries.length;i++){
+    var se=smpEntries[i];
+    var ma=se.note?(se.note.match(/\[([^\]]+)\]$/)||["",""])[1]:"";
+    smpRe+="<div style=\"border-left:3px solid var(--teal);padding:6px 10px;margin-bottom:7px;background:#e0f7fa20;border-radius:0 5px 5px 0\">"
+      +"<div class=\"txs ct\">&#9203; "+se.date+" &bull; "+FMT_DUR(se.dur||0)+(ma?" &bull; "+ma:"")+"</div>"
+      +"<div class=\"tsm mt2 cm\">"+(se.note||"").replace(/\[[^\]]+\]$/,"").trim()+"</div></div>";
+  }
+  return pH("o")
+    +"<div class=\"g2\"><div>"
+    +"<div class=\"card mb3\">"
+    +"<div class=\"flex fac fjb mb3\"><strong>&#128176; Kostencontrolling</strong>"
+    +"<button class=\"btn btn-g btn-sm\" data-action=\"openUC\" data-id=\""+p.id+"\">&#9998; Anpassen</button></div>"
+    +"<div class=\"tsm flex fjb mb2\"><span>Gesamt: <strong class=\"cr\">"+FMT(c.tot)+"</strong></span><span class=\"cm\">Plan: "+FMT(p.planK)+"</span></div>"
+    +pgbar(c.tot,p.planK,"")
+    +"<div class=\"g2 mt3\" style=\"gap:10px\">"
+    +"<div style=\"background:#e6f0fc;padding:10px;border-radius:6px\"><div class=\"txs cm\">Ersatzteile</div><div class=\"ff fw cb\" style=\"font-size:17px\">"+FMT(c.pk)+"</div></div>"
+    +"<div style=\"background:#e6f7ee;padding:10px;border-radius:6px\"><div class=\"txs cm\">Zeitkosten gesamt</div><div class=\"ff fw cg\" style=\"font-size:17px\">"+FMT(c.tk)+"</div><div class=\"txs cm\">"+FMTH(c.th)+" &times; "+c.rate+"&euro;/h</div></div>"
+    +"</div>"
+    // Zeit Aufschlüsselung
+    +(p.smpProj?"<div class=\"divid\"></div>"
+      +"<div class=\"ff\" style=\"font-size:12px;font-weight:600;margin-bottom:8px\">Zeit-Aufschl&uuml;sselung</div>"
+      +"<div style=\"display:flex;flex-direction:column;gap:5px\">"
+      +"<div class=\"flex fac fjb\"><span class=\"tsm cm\">&#128218; CR Tagebuch</span><span class=\"tsm fw cg\">"+FMTH(c.thCR)+"</span></div>"
+      +"<div class=\"flex fac fjb\"><span class=\"tsm cm\">&#9203; SMP Stempeluhr</span><span class=\"tsm fw ct\">"+FMTH(c.thSMP)+"</span></div>"
+      +"<div class=\"flex fac fjb\" style=\"border-top:1px solid var(--border);padding-top:5px\"><span class=\"tsm fw\">Gesamt</span><span class=\"tsm fw cr\">"+FMTH(c.th)+"</span></div>"
+      +"</div>":"")
+    +"<div class=\"divid\"></div><div class=\"tsm flex fjb mb2\"><span>Planzeit</span><span>"+FMTH(p.planZ)+"</span></div>"+pgbar(c.th,p.planZ,"pgb-gr")+"</div>"
+    +"<div class=\"card\"><div class=\"flex fac fjb mb3\"><strong>Fortschritt</strong></div>"
+    +"<div class=\"g2\" style=\"gap:10px;margin-bottom:12px\">"
+    +"<div class=\"stat\" style=\"padding:12px\"><div class=\"sv\" style=\"font-size:20px\">"+fi+"/"+ai+"</div><div class=\"sl\" style=\"font-size:9px\">Planpunkte</div></div>"
+    +"<div class=\"stat\" style=\"padding:12px\"><div class=\"sv\" style=\"font-size:20px\">"+ein+"/"+p.teile.length+"</div><div class=\"sl\" style=\"font-size:9px\">Teile eingebaut</div></div></div>"
+    +"<div class=\"divid\"></div><strong>Teile Status:</strong><div class=\"mt2\" style=\"line-height:2\">"+sr+"</div>"
+    +"<div class=\"divid\"></div>"
+    +"<div class=\"flex fac fjb mb2\"><strong>&#128218; Letzte Tagebuch-Eintr\u00e4ge</strong><button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"pb\">Alle</button></div>"
+    +re
+    +(p.smpProj&&smpRe?"<div class=\"flex fac fjb mb2 mt3\"><strong class=\"ct\">&#9203; Letzte Stempeluhr-Eintr\u00e4ge</strong><button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"pz\">Alle</button></div>"+smpRe:"")
+    +"</div></div></div>";
+}
+
+// ── PROJEKT ZEITERFASSUNG TAB ──────────────────────────────────────
+function vPZ(){
+  var p=curP();
+  var smpEntries=p.smpProj?getSMPTime(p.smpProj):[];
+  smpEntries.sort(function(a,b){return b.date>a.date?1:-1;});
+  var totH=0,totPay=0;
+  for(var i=0;i<smpEntries.length;i++){totH+=(smpEntries[i].dur||0)/3600000;totPay+=parseFloat(smpEntries[i].pay)||0;}
+  var rows="";
+  for(var i=0;i<smpEntries.length;i++){
+    var e=smpEntries[i];
+    var ma=(e.note||"").match(/\[([^\]]+)\]$/);
+    var note=(e.note||"").replace(/\[[^\]]+\]$/,"").trim();
+    var task=note.split(" \u2013 ")[0];
+    var detail=note.split(" \u2013 ").slice(1).join(" \u2013 ");
+    rows+="<tr><td class=\"txs\">"+e.date+"</td>"
+      +"<td class=\"txs ct fw\">"+FMT_DUR(e.dur||0)+"</td>"
+      +"<td class=\"tsm\">"+task+"</td>"
+      +"<td class=\"txs cm\">"+detail+"</td>"
+      +(ma?"<td><span class=\"b-purple\" style=\"display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:600;background:#f3e6fc;color:var(--purple);border:1px solid rgba(124,58,237,.2)\">"+ma[1]+"</span></td>":"<td></td>")
+      +"<td class=\"txs cg\">"+(e.pay>0?FMT_EUR(e.pay):"")+"</td>"
+      +"<td><button class=\"bic\" data-action=\"delSMPEntry\" data-id=\""+e.id+"\">&#128465;</button></td></tr>";
+  }
+  return pH("z")
+    +"<div class=\"g2\" style=\"margin-bottom:16px\">"
+    +"<div class=\"stat stat-teal\"><div class=\"sv ct\">"+FMTH(totH)+"</div><div class=\"sl\">Stunden aus Stempeluhr</div>"
+    +(p.smpProj?"<div class=\"txs cm mt2\">Verknüpft: "+p.smpProj+"</div>":"")+"</div>"
+    +"<div class=\"stat stat-teal\"><div class=\"sv ct\">"+FMT_EUR(totPay)+"</div><div class=\"sl\">Verdienst aus Stempeluhr</div>"
+    +"<div class=\"txs cm mt2\">"+smpEntries.length+" Eintr\u00e4ge</div></div>"
+    +"</div>"
+    +(p.smpProj?""
+      :"<div class=\"card mb3\" style=\"background:#e0f7fa20;border:1px solid rgba(8,145,178,.2)\">"
+        +"<div class=\"tsm ct fw mb2\">&#9203; Kein SMP-Projekt verknüpft</div>"
+        +"<div class=\"tsm cm mb2\">Verknüpfen Sie dieses Projekt mit einem Stempeluhr-Projekt um Zeiten automatisch zu synchronisieren.</div>"
+        +"<button class=\"btn btn-t btn-sm\" data-action=\"openPM\" data-id=\""+p.id+"\">Jetzt verknüpfen</button>"
+        +"</div>")
+    +(smpEntries.length>0
+      ?"<div class=\"twrap\"><table><thead><tr><th>Datum</th><th>Dauer</th><th>Arbeitsgang</th><th>Detail</th><th>Mitarbeiter</th><th>Betrag</th><th></th></tr></thead>"
+        +"<tbody>"+rows+"</tbody>"
+        +"<tfoot><tr style=\"background:var(--bg)\"><td colspan=\"1\" class=\"txs cm\">"+smpEntries.length+" Eintr.</td>"
+        +"<td class=\"fw ct\">"+FMTH(totH)+"</td><td colspan=\"3\"></td>"
+        +"<td class=\"fw cg\">"+FMT_EUR(totPay)+"</td><td></td></tr></tfoot></table></div>"
+      :"<div class=\"empty\"><p>Keine Stempeluhr-Eintr\u00e4ge f\u00fcr dieses Projekt.</p>"
+        +(p.smpProj?"<p class=\"txs mt2\">Neue Zeiten &uuml;ber &rarr; Zeiterfassung erfassen</p>":"")+"</div>")
+    +"</div>";
+}
+
+
+// ── STEMPELUHR (Zeiterfassung) ─────────────────────────────────────
+var stampStart=null,stampPause=null,pauseTotal=0,stampTimer=null,stampProjLink="";
+
+function startTimer(){
+  clearInterval(stampTimer);
+  stampTimer=setInterval(function(){
+    var disp=E("timer-disp");
+    if(!disp){clearInterval(stampTimer);return;}
+    if(stampStart&&!stampPause){
+      var elapsed=Date.now()-stampStart-pauseTotal;
+      disp.textContent=FMT_DUR_SHORT(elapsed);
+    }
+  },1000);
+}
+function checkStampTimer(){if(stampStart&&!stampPause)startTimer();}
+
+function stampAction(action){
+  if(action==="start"){
+    if(stampStart)return;
+    stampStart=Date.now();pauseTotal=0;stampPause=null;
+    startTimer();render();
+  }else if(action==="pause"){
+    if(!stampStart||stampPause)return;
+    stampPause=Date.now();render();
+  }else if(action==="resume"){
+    if(!stampPause)return;
+    pauseTotal+=Date.now()-stampPause;stampPause=null;
+    startTimer();render();
+  }else if(action==="stop"){
+    if(!stampStart)return;
+    var end=Date.now();
+    var isPaused=!!stampPause;
+    var dur=end-stampStart-(isPaused?pauseTotal+(end-stampPause):pauseTotal);
+    var rate=GF("z-rate")||0;
+    var proj=GV("z-proj")||"";
+    var task=GV("z-task")||"";
+    var note=GV("z-note")||"";
+    var ma=GV("z-ma")||"";
+    var noteStr=task?(note?task+" \u2013 "+note:task):note;
+    if(ma)noteStr=(noteStr?noteStr+" ["+ma+"]":"["+ma+"]");
+    var pay=rate>0?(dur/3600000*rate).toFixed(2):"0";
+    var entry={id:UID(),date:TODAY(),
+      start:new Date(stampStart).toISOString(),
+      end:new Date(end).toISOString(),
+      dur:dur,rate:rate,pay:parseFloat(pay),
+      proj:proj,note:noteStr};
+    APP.smp.zeit.push(entry);
+    saveData();
+    stampStart=null;stampPause=null;pauseTotal=0;stampProjLink="";
+    clearInterval(stampTimer);
+    render();toast("Zeit gespeichert \u2713 ("+FMT_DUR(dur)+")","ok");
+  }
+}
+
+function zManAdd(){
+  var d=GV("zm-date"),von=GV("zm-von"),bis=GV("zm-bis");
+  var rate=GF("zm-rate"),proj=GV("zm-proj"),task=GV("zm-task"),note=GV("zm-note"),pause=GI("zm-pause"),ma=GV("zm-ma");
+  if(!d||!von||!bis){toast("Datum, Von und Bis erforderlich.","err");return;}
+  var sT=new Date(d+"T"+von),eT=new Date(d+"T"+bis);
+  if(eT<=sT){toast("Endzeit muss nach Startzeit liegen.","err");return;}
+  var dur=Math.max(0,(eT-sT)-(pause*60000));
+  var noteStr=task?(note?task+" \u2013 "+note:task):note;
+  if(ma)noteStr=(noteStr?noteStr+" ["+ma+"]":"["+ma+"]");
+  var pay=rate>0?(dur/3600000*rate).toFixed(2):"0";
+  APP.smp.zeit.push({id:UID(),date:d,start:sT.toISOString(),end:eT.toISOString(),dur:dur,rate:rate,pay:parseFloat(pay),proj:proj,note:noteStr,pause:pause});
+  saveData();render();toast("Eintrag gespeichert \u2713","ok");
+}
+
+function zDel(id){
+  if(!confirm("Zeiteintrag l\u00f6schen?"))return;
+  APP.smp.zeit=APP.smp.zeit.filter(function(e){return e.id!==id;});
+  saveData();render();toast("Gel\u00f6scht.");
+}
+
+function buildProjOpts(selected){
+  // All SMP kundenprojekte + distinct projs from zeit
+  var seen={},list=[];
+  for(var i=0;i<APP.smp.kundenprojekte.length;i++){
+    var kp=APP.smp.kundenprojekte[i].proj||"";
+    if(kp&&!seen[kp]){seen[kp]=true;list.push(kp);}
+  }
+  for(var i=0;i<APP.smp.zeit.length;i++){
+    var zp=APP.smp.zeit[i].proj||"";
+    if(zp&&!seen[zp]){seen[zp]=true;list.push(zp);}
+  }
+  // Also add CR project names
+  for(var i=0;i<D().projects.length;i++){
+    var pn=D().projects[i].name;
+    if(!seen[pn]){seen[pn]=true;list.push(pn);}
+    if(D().projects[i].smpProj&&!seen[D().projects[i].smpProj]){seen[D().projects[i].smpProj]=true;list.push(D().projects[i].smpProj);}
+  }
+  list.sort();
+  var opts="<option value=\"\">-- Kein Projekt --</option>";
+  for(var i=0;i<list.length;i++)opts+="<option value=\""+list[i]+"\""+(list[i]===selected?" selected":"")+">"+list[i]+"</option>";
+  return opts;
+}
+function buildMAOpts(selected){
+  var seen={},list=[];
+  for(var i=0;i<APP.smp.mitarbeiter.length;i++){var m=APP.smp.mitarbeiter[i].name;if(!seen[m]){seen[m]=true;list.push(m);}}
+  for(var i=0;i<APP.smp.zeit.length;i++){var m=(APP.smp.zeit[i].note||"").match(/\[([^\]]+)\]$/);if(m&&!seen[m[1]]){seen[m[1]]=true;list.push(m[1]);}}
+  var opts="<option value=\"\">-- Kein Mitarbeiter --</option>";
+  for(var i=0;i<list.length;i++)opts+="<option value=\""+list[i]+"\""+(list[i]===selected?" selected":"")+">"+list[i]+"</option>";
+  return opts;
+}
+function buildTaskOpts(selected){
+  var seen={},list=[];
+  for(var i=0;i<APP.smp.arbeitsgaenge.length;i++){var a=APP.smp.arbeitsgaenge[i].name;if(!seen[a]){seen[a]=true;list.push(a);}}
+  for(var i=0;i<APP.smp.zeit.length;i++){
+    var n=(APP.smp.zeit[i].note||"").replace(/\[[^\]]+\]$/,"").split(" \u2013 ")[0].trim();
+    if(n&&!seen[n]){seen[n]=true;list.push(n);}
+  }
+  var opts="<option value=\"\">-- Kein Arbeitsgang --</option>";
+  for(var i=0;i<list.length;i++)opts+="<option value=\""+list[i]+"\""+(list[i]===selected?" selected":"")+">"+list[i]+"</option>";
+  return opts;
+}
+
+function vZeit(){
+  var isRunning=stampStart&&!stampPause;
+  var isPaused=stampStart&&stampPause;
+  var elapsed=stampStart?(Date.now()-stampStart-(isPaused?pauseTotal+(Date.now()-stampPause):pauseTotal)):0;
+  var todayH=0,todayPay=0,todayStr=TODAY();
+  for(var i=0;i<APP.smp.zeit.length;i++){if(APP.smp.zeit[i].date===todayStr){todayH+=(APP.smp.zeit[i].dur||0)/3600000;todayPay+=parseFloat(APP.smp.zeit[i].pay)||0;}}
+  var totalH=0,totalPay=0;
+  for(var i=0;i<APP.smp.zeit.length;i++){totalH+=(APP.smp.zeit[i].dur||0)/3600000;totalPay+=parseFloat(APP.smp.zeit[i].pay)||0;}
+  var stampBtns="";
+  if(!stampStart){
+    stampBtns="<button class=\"stamp-btn\" style=\"background:#e6f7ee;color:var(--green2);border-color:var(--green2)\" onclick=\"stampAction('start')\">&#9654;<span style=\"display:block;margin-top:3px;font-size:10px\">START</span></button>";
+  }else if(isRunning){
+    stampBtns="<button class=\"stamp-btn\" style=\"background:#fff8e6;color:var(--amber);border-color:var(--amber)\" onclick=\"stampAction('pause')\">&#9646;&#9646;<span style=\"display:block;margin-top:3px;font-size:10px\">PAUSE</span></button>"
+      +"<button class=\"stamp-btn\" style=\"background:#fde8ec;color:var(--red);border-color:var(--red)\" onclick=\"stampAction('stop')\">&#9632;<span style=\"display:block;margin-top:3px;font-size:10px\">STOP</span></button>";
+  }else{
+    stampBtns="<button class=\"stamp-btn\" style=\"background:#e6f7ee;color:var(--green2);border-color:var(--green2)\" onclick=\"stampAction('resume')\">&#9654;<span style=\"display:block;margin-top:3px;font-size:10px\">WEITER</span></button>"
+      +"<button class=\"stamp-btn\" style=\"background:#fde8ec;color:var(--red);border-color:var(--red)\" onclick=\"stampAction('stop')\">&#9632;<span style=\"display:block;margin-top:3px;font-size:10px\">STOP</span></button>";
+  }
+  var projOpts=buildProjOpts(stampProjLink);
+  var maOpts=buildMAOpts("");
+  var taskOpts=buildTaskOpts("");
+  return "<div class=\"page\"><div class=\"pt mb3\">&#9203; Zeiterfassung</div>"
+    +"<div class=\"zt-sum\">"
+    +"<div class=\"zt-kpi\"><div class=\"zt-kv\">"+FMTH(todayH)+"</div><div class=\"zt-kl\">Heute</div></div>"
+    +"<div class=\"zt-kpi\"><div class=\"zt-kv\">"+FMT_EUR(todayPay)+"</div><div class=\"zt-kl\">Verdienst heute</div></div>"
+    +"<div class=\"zt-kpi\"><div class=\"zt-kv\">"+FMTH(totalH)+"</div><div class=\"zt-kl\">Gesamt</div></div>"
+    +"<div class=\"zt-kpi\"><div class=\"zt-kv\">"+FMT_EUR(totalPay)+"</div><div class=\"zt-kl\">Gesamtverdienst</div></div>"
+    +"</div>"
+    +"<div class=\"g2\">"
+    +"<div class=\"card\"><div style=\"font-size:13px;font-weight:700;margin-bottom:14px\">&#9203; Stempeluhr</div>"
+    +"<div class=\"timer-disp\" id=\"timer-disp\">"+(stampStart?FMT_DUR_SHORT(elapsed):"00:00")+"</div>"
+    +"<div style=\"font-size:11px;color:var(--text3);text-align:center;margin-bottom:12px\">"+(isRunning?"L\u00e4uft...":isPaused?"Pausiert":"Bereit")+"</div>"
+    +"<div style=\"display:flex;justify-content:center;gap:14px;margin-bottom:18px\">"+stampBtns+"</div>"
+    +"<div class=\"fg\"><label class=\"fl\">Projekt</label><select class=\"fsel\" id=\"z-proj\" onchange=\"stampProjLink=this.value\">"+projOpts+"</select></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Arbeitsgang</label><select class=\"fsel\" id=\"z-task\">"+taskOpts+"</select></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Notiz / Detail</label><input class=\"fi\" id=\"z-note\" placeholder=\"Zus\u00e4tzliche Details\u2026\"></div>"
+    +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Stundensatz &euro;/h</label><input class=\"fi\" id=\"z-rate\" type=\"number\" placeholder=\"109\" step=\"1\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Mitarbeiter</label><select class=\"fsel\" id=\"z-ma\">"+maOpts+"</select></div></div>"
+    +"</div>"
+    +"<div class=\"card\"><div style=\"font-size:13px;font-weight:700;margin-bottom:14px\">&#9998; Manuell erfassen</div>"
+    +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Datum</label><input class=\"fi\" type=\"date\" id=\"zm-date\" value=\""+TODAY()+"\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Pause (min)</label><input class=\"fi\" type=\"number\" id=\"zm-pause\" placeholder=\"0\" min=\"0\"></div></div>"
+    +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Von</label><input class=\"fi\" type=\"time\" id=\"zm-von\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Bis</label><input class=\"fi\" type=\"time\" id=\"zm-bis\"></div></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Projekt</label><select class=\"fsel\" id=\"zm-proj\">"+projOpts+"</select></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Arbeitsgang</label><select class=\"fsel\" id=\"zm-task\">"+taskOpts+"</select></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Notiz / Detail</label><input class=\"fi\" id=\"zm-note\" placeholder=\"Zus\u00e4tzliche Details\u2026\"></div>"
+    +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Stundensatz &euro;/h</label><input class=\"fi\" type=\"number\" id=\"zm-rate\" placeholder=\"109\" step=\"1\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Mitarbeiter</label><select class=\"fsel\" id=\"zm-ma\">"+maOpts+"</select></div></div>"
+    +"<button class=\"btn btn-t\" style=\"width:100%;margin-top:4px\" onclick=\"zManAdd()\">+ Eintrag speichern</button>"
+    +"</div></div>"
+    +"<div class=\"card mt4\"><div class=\"flex fac fjb mb3\"><strong>Letzte 10 Eintr\u00e4ge</strong>"
+    +"<button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"zeitliste\">Alle anzeigen &rarr;</button></div>"
+    +buildZRows(APP.smp.zeit.slice().sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,10))
+    +"</div></div>";
+}
+
+function buildZRows(entries){
+  if(!entries.length)return"<div class=\"empty\" style=\"padding:16px\"><p>Noch keine Zeiteintr\u00e4ge.</p></div>";
+  var rows="";
+  for(var i=0;i<entries.length;i++){
+    var e=entries[i];
+    var ma=(e.note||"").match(/\[([^\]]+)\]$/);
+    var note=(e.note||"").replace(/\[[^\]]+\]$/,"").trim();
+    rows+="<div class=\"zt-row\">"
+      +"<span class=\"zt-date\">"+e.date+"</span>"
+      +"<span class=\"zt-dur\">"+FMT_DUR(e.dur||0)+"</span>"
+      +(e.proj?"<span class=\"zt-proj\">"+e.proj.split(" / ").pop()+"</span>":"")
+      +(ma?"<span class=\"zt-ma\">"+ma[1]+"</span>":"")
+      +"<span class=\"zt-note\">"+note+"</span>"
+      +(e.pay>0?"<span class=\"zt-pay\">"+FMT_EUR(e.pay)+"</span>":"")
+      +"<button class=\"bic\" data-action=\"delSMPEntry\" data-id=\""+e.id+"\">&#128465;</button>"
+      +"</div>";
+  }
+  return rows;
+}
+
+function vZeitListe(){
+  var all=APP.smp.zeit.slice().sort(function(a,b){return b.date>a.date?1:-1;});
+  var totalH=0,totalPay=0;
+  for(var i=0;i<all.length;i++){totalH+=(all[i].dur||0)/3600000;totalPay+=parseFloat(all[i].pay)||0;}
+  return "<div class=\"page\"><div class=\"pt mb3\">&#128203; Alle Zeiteintr\u00e4ge</div>"
+    +"<div class=\"g2\" style=\"margin-bottom:16px\">"
+    +"<div class=\"stat stat-teal\"><div class=\"sv ct\">"+FMTH(totalH)+"</div><div class=\"sl\">Gesamtstunden</div></div>"
+    +"<div class=\"stat stat-teal\"><div class=\"sv ct\">"+FMT_EUR(totalPay)+"</div><div class=\"sl\">Gesamtverdienst</div><div class=\"tsm cm mt2\">"+all.length+" Eintr\u00e4ge</div></div>"
+    +"</div>"
+    +"<div class=\"card\">"+buildZRows(all)+"</div>"
+    +"</div>";
+}
+
+function vZeitRep(){
+  var all=APP.smp.zeit;
+  var byProj={},byMA={};
+  var totalH=0,totalPay=0;
+  for(var i=0;i<all.length;i++){
+    var e=all[i],h=(e.dur||0)/3600000,pay=parseFloat(e.pay)||0;
+    totalH+=h;totalPay+=pay;
+    var pk=e.proj||"Kein Projekt";
+    if(!byProj[pk]){byProj[pk]={h:0,pay:0,cnt:0};}
+    byProj[pk].h+=h;byProj[pk].pay+=pay;byProj[pk].cnt++;
+    var ma=(e.note||"").match(/\[([^\]]+)\]$/);
+    var mak=ma?ma[1]:"Unbekannt";
+    if(!byMA[mak]){byMA[mak]={h:0,pay:0,cnt:0};}
+    byMA[mak].h+=h;byMA[mak].pay+=pay;byMA[mak].cnt++;
+  }
+  var prows="",maxPay=0;
+  var projKeys=Object.keys(byProj).sort(function(a,b){return byProj[b].pay-byProj[a].pay;});
+  for(var i=0;i<projKeys.length;i++)if(byProj[projKeys[i]].pay>maxPay)maxPay=byProj[projKeys[i]].pay;
+  for(var i=0;i<projKeys.length;i++){
+    var k=projKeys[i],g=byProj[k];
+    var barW=maxPay>0?Math.round(g.pay/maxPay*100):0;
+    prows+="<tr><td style=\"font-weight:600;color:var(--amber);max-width:200px\">"+k+"</td>"
+      +"<td class=\"ct fw\">"+FMTH(g.h)+"</td>"
+      +"<td class=\"cg fw\">"+FMT_EUR(g.pay)+"</td>"
+      +"<td>"+g.cnt+"</td>"
+      +"<td><div style=\"height:6px;border-radius:3px;background:var(--amber);width:"+barW+"%;min-width:2px\"></div></td></tr>";
+  }
+  var marows="";
+  var maKeys=Object.keys(byMA).sort(function(a,b){return byMA[b].h-byMA[a].h;});
+  for(var i=0;i<maKeys.length;i++){
+    var k=maKeys[i],g=byMA[k];
+    marows+="<tr><td style=\"font-weight:600;color:var(--purple)\">"+k+"</td>"
+      +"<td class=\"ct fw\">"+FMTH(g.h)+"</td>"
+      +"<td class=\"cg fw\">"+FMT_EUR(g.pay)+"</td>"
+      +"<td>"+g.cnt+"</td></tr>";
+  }
+  return "<div class=\"page\"><div class=\"pt mb3\">&#128196; Zeit-Berichte</div>"
+    +"<div class=\"zt-sum\" style=\"margin-bottom:16px\">"
+    +"<div class=\"zt-kpi\"><div class=\"zt-kv\">"+all.length+"</div><div class=\"zt-kl\">Eintr\u00e4ge</div></div>"
+    +"<div class=\"zt-kpi\"><div class=\"zt-kv\">"+FMTH(totalH)+"</div><div class=\"zt-kl\">Gesamtstunden</div></div>"
+    +"<div class=\"zt-kpi\"><div class=\"zt-kv\">"+projKeys.length+"</div><div class=\"zt-kl\">Projekte</div></div>"
+    +"<div class=\"zt-kpi\"><div class=\"zt-kv\">"+FMT_EUR(totalPay)+"</div><div class=\"zt-kl\">Gesamtverdienst</div></div>"
+    +"</div>"
+    +"<div class=\"card mb3\"><div class=\"ff fw mb3\" style=\"font-size:15px\">Projekte nach Umsatz</div>"
+    +(prows?"<div class=\"twrap\"><table><thead><tr><th>Projekt</th><th>Stunden</th><th>Umsatz</th><th>Eintr\u00e4ge</th><th style=\"width:100px\">Anteil</th></tr></thead><tbody>"+prows+"</tbody></table></div>"
+    :"<p class=\"cm txs\">Keine Daten.</p>")
+    +"</div>"
+    +"<div class=\"card\"><div class=\"ff fw mb3\" style=\"font-size:15px\">Mitarbeiter-Auswertung</div>"
+    +(marows?"<div class=\"twrap\"><table><thead><tr><th>Mitarbeiter</th><th>Stunden</th><th>Umsatz</th><th>Eintr\u00e4ge</th></tr></thead><tbody>"+marows+"</tbody></table></div>"
+    :"<p class=\"cm txs\">Keine Daten.</p>")
+    +"</div></div>";
+}
+
+
+// ── PLANNING, DISMOUNT, PARTS, DIARY (adapted from CR) ─────────────
+function vPP(){
+  var p=curP(),d=D(),tPK=0;
+  for(var i=0;i<p.gruppen.length;i++)tPK+=p.gruppen[i].planK;
+  var gvBtns="";
+  if(d.gruppenVorlagen&&d.gruppenVorlagen.length){
+    gvBtns="<div class=\"card mb3\"><div class=\"tsm cm mb2\">Gruppe aus Vorlage:</div><div class=\"flex\" style=\"flex-wrap:wrap;gap:5px\">";
+    for(var i=0;i<d.gruppenVorlagen.length;i++)gvBtns+="<button class=\"btn btn-g btn-sm\" data-action=\"useGV\" data-id=\""+d.gruppenVorlagen[i].id+"\">"+d.gruppenVorlagen[i].name+"</button>";
+    gvBtns+="</div></div>";
+  }
+  var tree="";
+  for(var i=0;i<p.gruppen.length;i++){
+    var g=p.gruppen[i],rows="";
+    if(!g.col)for(var j=0;j<g.items.length;j++){
+      var it=g.items[j];
+      rows+="<div class=\"titem\">"+dot(it.status)+"<div style=\"flex:1\"><div class=\"tsm fw\">"+it.name+"</div>"+(it.zustand?"<div class=\"txs cm\">"+it.zustand+"</div>":"")+"</div>"
+        +"<div class=\"txs cm flex g3p fac\">"+FMT(it.planK)+" &bull; "+FMTH(it.planZ)+"&nbsp;&nbsp;"+plb(it.status)+"</div>"
+        +"<div class=\"flex g2p\"><button class=\"bic\" data-action=\"openIM\" data-id=\""+g.id+"\" data-id2=\""+it.id+"\">&#9998;</button>"
+        +"<button class=\"bic\" data-action=\"delI\" data-id=\""+g.id+"\" data-id2=\""+it.id+"\">&#215;</button></div></div>";
+    }
+    tree+="<div class=\"tgroup\"><div class=\"tgh\" data-action=\"togG\" data-id=\""+g.id+"\">"
+      +"<span class=\"ttog"+(!g.col?" op":"")+"\">\u25B6</span>"
+      +"<div style=\"flex:1\"><strong class=\"tsm\">"+g.name+"</strong><span class=\"txs cm\" style=\"margin-left:7px\">"+g.items.length+" Pkt.</span></div>"
+      +"<div class=\"txs cm\" style=\"margin-right:8px\">"+FMT(g.planK)+"</div>"
+      +"<div class=\"flex g2p\"><button class=\"bic\" data-action=\"openIM\" data-id=\""+g.id+"\">+</button>"
+      +"<button class=\"bic\" data-action=\"openGM\" data-id=\""+g.id+"\">&#9998;</button>"
+      +"<button class=\"bic\" data-action=\"delG\" data-id=\""+g.id+"\">&#215;</button></div></div>"
+      +(!g.col&&rows?"<div class=\"tgb\">"+rows+"</div>":"")+"</div>";
+  }
+  return pH("p")
+    +"<div class=\"flex fac fjb mb3\"><span class=\"tsm cm\">Plan: <strong class=\"cr\">"+FMT(tPK)+"</strong></span>"
+    +"<div class=\"flex g2p\"><button class=\"btn btn-g btn-sm\" data-action=\"togAll\">Aufklappen</button>"
+    +"<button class=\"btn btn-p btn-sm\" data-action=\"openGM\">+ Gruppe</button></div></div>"
+    +gvBtns+"<div class=\"card\">"+(tree||"<div class=\"empty\"><p>Noch keine Gruppen</p></div>")+"</div></div>";
+}
+
+function vPD(){
+  var p=curP(),steps="";
+  for(var i=0;i<p.demontage.length;i++){
+    var s=p.demontage[i],ph="";
+    for(var j=0;j<s.bilder.length;j++)ph+="<img src=\""+s.bilder[j].src+"\" class=\"pthumb\" data-action=\"lbox\" data-id=\""+s.bilder[j].src+"\">";
+    steps+="<div class=\"dstep\"><div class=\"dsnr\">"+s.nr+"</div>"
+      +"<div class=\"flex fac fjb\" style=\"margin-top:8px\"><div class=\"flex fac g2p\"><strong class=\"tsm\">"+s.titel+"</strong>"
+      +badge("b-gray",s.bereich)+(s.status==="Fertig"?badge("b-green","\u2713 Fertig"):badge("b-blue","In Arbeit"))+"</div>"
+      +"<div class=\"flex g2p\"><button class=\"bic\" data-action=\"openDM\" data-id=\""+s.id+"\">&#9998;</button>"
+      +"<button class=\"bic\" data-action=\"delD\" data-id=\""+s.id+"\">&#128465;</button></div></div>"
+      +"<div class=\"txs cm mt2\">"+FMTD(s.datum)+"</div>"
+      +"<div class=\"tsm mt2\" style=\"color:var(--text2)\">"+s.info+"</div>"
+      +"<div class=\"pgrid\">"+ph+"<label class=\"pupl\"><input type=\"file\" accept=\"image/*\" multiple onchange=\"addPh(event,'d','"+s.id+"')\"><span style=\"font-size:18px\">&#128247;</span><span>Foto</span></label></div></div>";
+  }
+  return pH("d")+"<div class=\"flex fac fjb mb3\"><span class=\"tsm cm\">"+p.demontage.length+" Schritte</span>"
+    +"<button class=\"btn btn-p\" data-action=\"openDM\">+ Schritt</button></div>"
+    +(steps||"<div class=\"empty\"><p>Noch keine Schritte</p></div>")+"</div>";
+}
+
+function vPT(){
+  var p=curP();if(!p)return "<div class=\"page\"><p class=\"empty\">Kein Projekt ausgewählt.</p></div>";
+  var teile=p.teile.slice(),totK=0;
+  if(APP.pf)teile=teile.filter(function(t){return t.status===APP.pf;});
+  if(APP.ps){var q=APP.ps.toLowerCase();teile=teile.filter(function(t){return(t.name+t.nr+t.gr+t.lief).toLowerCase().indexOf(q)>=0;});}
+  for(var i=0;i<teile.length;i++)totK+=teile[i].kosten||0;
+  var rows="";
+  for(var i=0;i<teile.length;i++){
+    var t=teile[i];
+    rows+="<tr><td><div class=\"tsm fw\">"+t.name+"</div><div class=\"txs cm\">"+t.nr+" &bull; "+t.gr+"</div></td>"
+      +"<td class=\"ff fw\" style=\"text-align:center;font-size:14px\">"+t.menge+"</td>"
+      +"<td>"+psb(t.status)+"</td><td class=\"tsm cm\">"+(t.lief||"&mdash;")+"</td>"
+      +"<td style=\"text-align:right;font-size:12px\">"+(t.kosten>0?FMT(t.kosten):"&mdash;")+"</td>"
+      +"<td><div class=\"flex g2p\" style=\"justify-content:flex-end\"><button class=\"bic\" data-action=\"openTM\" data-id=\""+t.id+"\">&#9998;</button>"
+      +"<button class=\"bic\" data-action=\"delT\" data-id=\""+t.id+"\">&#128465;</button></div></td></tr>";
+  }
+  var fb="<span class=\"badge b-gray\" style=\"cursor:pointer;"+(!APP.pf?"background:var(--red);color:#fff;border-color:var(--red)":"")+"\" data-action=\"fParts\" data-id=\"\">Alle</span> ";
+  for(var i=0;i<PST.length;i++){var ps=PST[i];fb+="<span class=\"badge "+ps.c+"\" style=\"cursor:pointer;"+(APP.pf===ps.v?"box-shadow:0 0 0 2px var(--red)":"")+"\" data-action=\"fParts\" data-id=\""+ps.v+"\">"+ps.i+" "+ps.l+"</span> ";}
+  return pH("t")+"<div class=\"flex fac fjb mb3\" style=\"flex-wrap:wrap;gap:8px\">"
+    +"<input id=\"PSRCH\" class=\"fi\" style=\"width:200px\" placeholder=\"Suche...\" value=\""+APP.ps+"\">"
+    +"<div class=\"flex g2p fac\"><span class=\"txs cm\">"+teile.length+" Teile &bull; "+FMT(totK)+"</span>"
+    +"<button class=\"btn btn-p\" data-action=\"openTM\">+ Ersatzteil</button></div></div>"
+    +"<div class=\"card mb3\" style=\"padding:10px\"><div style=\"display:flex;flex-wrap:wrap;gap:5px\">"+fb+"</div></div>"
+    +(rows?"<div class=\"twrap\"><table><thead><tr><th>Bezeichnung</th><th>Menge</th><th>Status</th><th>Lieferant</th><th>Kosten</th><th></th></tr></thead>"
+    +"<tbody>"+rows+"</tbody><tfoot><tr style=\"background:var(--bg)\"><td colspan=\"4\" class=\"txs cm\">Gesamt</td><td style=\"text-align:right;font-weight:600;color:var(--red)\">"+FMT(totK)+"</td><td></td></tr></tfoot></table></div>"
+    :"<div class=\"empty\"><p>Keine Teile</p></div>")+"</div>";
+}
+
+function vPB(){
+  var p=curP(),tZ=0,tK=0;
+  for(var i=0;i<p.tagebuch.length;i++){tZ+=parseFloat(p.tagebuch[i].zeit)||0;tK+=parseFloat(p.tagebuch[i].kosten)||0;}
+  var sorted=p.tagebuch.slice().sort(function(a,b){return b.datum.localeCompare(a.datum);});
+  var ents="";
+  for(var i=0;i<sorted.length;i++){
+    var e=sorted[i];
+    ents+="<div class=\"de\"><div class=\"ddot\">&#128218;</div><div class=\"dc\">"
+      +"<div class=\"flex fac fjb\"><span class=\"txs cm\">"+FMTD(e.datum)+(e.zeit?" &bull; "+FMTH(e.zeit):"")+"</span>"
+      +"<div class=\"flex g2p\"><button class=\"bic\" data-action=\"openBM\" data-id=\""+e.id+"\">&#9998;</button>"
+      +"<button class=\"bic\" data-action=\"delB\" data-id=\""+e.id+"\">&#128465;</button></div></div>"
+      +"<div class=\"tsm mt2\" style=\"line-height:1.5\">"+e.info+"</div>"
+      +"<div class=\"flex g4p txs cm mt2\">"+(e.zeit?"<span>&#8987; "+FMTH(e.zeit)+"</span>":"")+(e.kosten?"<span>&#128176; "+FMT(e.kosten)+"</span>":"")+"</div>"
+      +"</div></div>";
+  }
+  var c=costs(p);
+  return pH("b")
+    +"<div class=\"flex fac fjb mb3\"><span class=\"tsm cm\">"+p.tagebuch.length+" Eintr\u00e4ge &bull; "+FMTH(c.thCR)+" CR-Zeit"
+    +(c.thSMP>0?" &bull; "+FMTH(c.thSMP)+" &#9203;-Zeit":"")
+    +"</span><button class=\"btn btn-p\" data-action=\"openBM\">+ Eintrag</button></div>"
+    +(ents||"<div class=\"empty\"><p>Noch keine Eintr\u00e4ge</p></div>")+"</div>";
+}
+
+// ── FAHRZEUGBEFUND TAB02 ─────────────────────────────────────────
+var BEFUND_TPL=[{"id": "01.01", "bereich": "Motorraum", "name": "Motor", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.02", "bereich": "Motorraum", "name": "Kühlung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.03", "bereich": "Motorraum", "name": "Wasserpumpe", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.04", "bereich": "Motorraum", "name": "Abgasanlage", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.05", "bereich": "Motorraum", "name": "Gemischaufbereitung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.06", "bereich": "Motorraum", "name": "Kraftstoffversorgung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.07", "bereich": "Motorraum", "name": "Klimaanlage", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.08", "bereich": "Motorraum", "name": "Servopumpe", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.09", "bereich": "Motorraum", "name": "Halterungen", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.10", "bereich": "Motorraum", "name": "Generator", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.11", "bereich": "Motorraum", "name": "Anlasser/Starter", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.12", "bereich": "Motorraum", "name": "Zündanlage", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.13", "bereich": "Motorraum", "name": "Motorsteuerung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.14", "bereich": "Motorraum", "name": "Scheibenwaschanlage", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "01.15", "bereich": "Motorraum", "name": "Scheibenwischeranlage", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.1", "bereich": "Kraftübertragung", "name": "Kupplung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.2", "bereich": "Kraftübertragung", "name": "Getriebe", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.3", "bereich": "Kraftübertragung", "name": "Gelenkwellen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.3", "bereich": "Kraftübertragung", "name": "Gelenkwellen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.3", "bereich": "Kraftübertragung", "name": "Gelenkwellen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.3", "bereich": "Kraftübertragung", "name": "Gelenkwellen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.4", "bereich": "Kraftübertragung", "name": "Ausgleichsgetriebe", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.5", "bereich": "Kraftübertragung", "name": "Radantrieb", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.5", "bereich": "Kraftübertragung", "name": "Radantrieb", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.5", "bereich": "Kraftübertragung", "name": "Radantrieb", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "02.5", "bereich": "Kraftübertragung", "name": "Radantrieb", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.1", "bereich": "Fahrwerk", "name": "Reifen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.1", "bereich": "Fahrwerk", "name": "Reifen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.1", "bereich": "Fahrwerk", "name": "Reifen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.1", "bereich": "Fahrwerk", "name": "Reifen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.2", "bereich": "Fahrwerk", "name": "Felgen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.2", "bereich": "Fahrwerk", "name": "Felgen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.2", "bereich": "Fahrwerk", "name": "Felgen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.2", "bereich": "Fahrwerk", "name": "Felgen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.3", "bereich": "Fahrwerk", "name": "Radaufhängungen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.3", "bereich": "Fahrwerk", "name": "Radaufhängungen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.3", "bereich": "Fahrwerk", "name": "Radaufhängungen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.3", "bereich": "Fahrwerk", "name": "Radaufhängungen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.4", "bereich": "Fahrwerk", "name": "Federung", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.4", "bereich": "Fahrwerk", "name": "Federung", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.4", "bereich": "Fahrwerk", "name": "Federung", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.4", "bereich": "Fahrwerk", "name": "Federung", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.5", "bereich": "Fahrwerk", "name": "Schwingungsdämpfung", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.5", "bereich": "Fahrwerk", "name": "Schwingungsdämpfung", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.5", "bereich": "Fahrwerk", "name": "Schwingungsdämpfung", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.5", "bereich": "Fahrwerk", "name": "Schwingungsdämpfung", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.6", "bereich": "Fahrwerk", "name": "Bremsen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.6", "bereich": "Fahrwerk", "name": "Bremsen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.6", "bereich": "Fahrwerk", "name": "Bremsen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.6", "bereich": "Fahrwerk", "name": "Bremsen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.7", "bereich": "Fahrwerk", "name": "Achsen", "pos": "V", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.7", "bereich": "Fahrwerk", "name": "Achsen", "pos": "H", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.8", "bereich": "Fahrwerk", "name": "Lenkung/Spurstange", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.9", "bereich": "Fahrwerk", "name": "Feststellbremse", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "03.10", "bereich": "Fahrwerk", "name": "Bremsleitungen", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.1", "bereich": "Innenraum", "name": "Sonnenblenden", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.1", "bereich": "Innenraum", "name": "Sonnenblenden", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.2", "bereich": "Innenraum", "name": "Rückspiegel innen", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.3", "bereich": "Innenraum", "name": "Bodenbelag", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.4", "bereich": "Innenraum", "name": "Dachhimmel", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.5", "bereich": "Innenraum", "name": "Sitze", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.5", "bereich": "Innenraum", "name": "Sitze", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.5", "bereich": "Innenraum", "name": "Sitze", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.5", "bereich": "Innenraum", "name": "Sitze", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.6", "bereich": "Innenraum", "name": "Seitenverkleidungen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.6", "bereich": "Innenraum", "name": "Seitenverkleidungen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.6", "bereich": "Innenraum", "name": "Seitenverkleidungen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.6", "bereich": "Innenraum", "name": "Seitenverkleidungen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.7", "bereich": "Innenraum", "name": "Armaturenbrett", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.8", "bereich": "Innenraum", "name": "Anzeigeinstrumente", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.9", "bereich": "Innenraum", "name": "Heckablage", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.10", "bereich": "Innenraum", "name": "Radio/Lautsprecher", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.11", "bereich": "Innenraum", "name": "Sicherheitsgurte", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.11", "bereich": "Innenraum", "name": "Sicherheitsgurte", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.11", "bereich": "Innenraum", "name": "Sicherheitsgurte", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.11", "bereich": "Innenraum", "name": "Sicherheitsgurte", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.12", "bereich": "Innenraum", "name": "Kopfstützen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.12", "bereich": "Innenraum", "name": "Kopfstützen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.12", "bereich": "Innenraum", "name": "Kopfstützen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.12", "bereich": "Innenraum", "name": "Kopfstützen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.13", "bereich": "Innenraum", "name": "Lüftung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.14", "bereich": "Innenraum", "name": "Heizung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.15", "bereich": "Innenraum", "name": "Klimaregelung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.16", "bereich": "Innenraum", "name": "Scheibenreinigung/Betätigung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "04.17", "bereich": "Innenraum", "name": "Lenkrad/Lenkradschloss", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "05.1", "bereich": "Gepäckraum/Laderaum", "name": "Halterungen", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "05.2", "bereich": "Gepäckraum/Laderaum", "name": "Verkleidungen", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "05.3", "bereich": "Gepäckraum/Laderaum", "name": "Bordwerkzeug", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "05.4", "bereich": "Gepäckraum/Laderaum", "name": "Ersatzrad", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "05.5", "bereich": "Gepäckraum/Laderaum", "name": "Matten", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06", "bereich": "Türen", "name": "Türen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06", "bereich": "Türen", "name": "Türen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06", "bereich": "Türen", "name": "Türen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06", "bereich": "Türen", "name": "Türen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.1", "bereich": "Türen", "name": "Zierleisten", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.1", "bereich": "Türen", "name": "Zierleisten", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.1", "bereich": "Türen", "name": "Zierleisten", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.1", "bereich": "Türen", "name": "Zierleisten", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.2", "bereich": "Türen", "name": "Fensterheber", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.2", "bereich": "Türen", "name": "Fensterheber", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.2", "bereich": "Türen", "name": "Fensterheber", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.2", "bereich": "Türen", "name": "Fensterheber", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.3", "bereich": "Türen", "name": "Türverriegelungen", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.3", "bereich": "Türen", "name": "Türverriegelungen", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.3", "bereich": "Türen", "name": "Türverriegelungen", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.3", "bereich": "Türen", "name": "Türverriegelungen", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.4", "bereich": "Türen", "name": "Aussenspiegel", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.4", "bereich": "Türen", "name": "Aussenspiegel", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.5", "bereich": "Türen", "name": "Türinnenverkleidung", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.5", "bereich": "Türen", "name": "Türinnenverkleidung", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.5", "bereich": "Türen", "name": "Türinnenverkleidung", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "06.5", "bereich": "Türen", "name": "Türinnenverkleidung", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "07.1", "bereich": "Motorhaube", "name": "Motorhaubenverriegelung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "07.2", "bereich": "Motorhaube", "name": "sonstiges", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "09.1", "bereich": "Heckklappe", "name": "Heckklappenverriegelung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "09.2", "bereich": "Heckklappe", "name": "sonstiges", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "10.1", "bereich": "Tankklappe", "name": "Tankklappenverriegelung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "10.2", "bereich": "Tankklappe", "name": "Tankverschluss", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "11", "bereich": "Kotflügel vorn", "name": "Kotflügel vorn", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "11", "bereich": "Kotflügel vorn", "name": "Kotflügel vorn", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "11.1", "bereich": "Kotflügel vorn", "name": "Zierleisten", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "11.1", "bereich": "Kotflügel vorn", "name": "Zierleisten", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "11.2", "bereich": "Kotflügel vorn", "name": "sonstiges", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "12", "bereich": "Seitenteile/Kotflügel", "name": "Seitenteile/Kotflügel", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "12", "bereich": "Seitenteile/Kotflügel", "name": "Seitenteile/Kotflügel", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "12.1", "bereich": "Seitenteile/Kotflügel", "name": "Zierleisten", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "12.1", "bereich": "Seitenteile/Kotflügel", "name": "Zierleisten", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "12.2", "bereich": "Seitenteile/Kotflügel", "name": "sonstiges", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.1", "bereich": "Grundkarosse", "name": "Dach", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.2", "bereich": "Grundkarosse", "name": "Schiebedach", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.3", "bereich": "Grundkarosse", "name": "Verdeck", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.4", "bereich": "Grundkarosse", "name": "Frontblech", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.5", "bereich": "Grundkarosse", "name": "Heckblech", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.6", "bereich": "Grundkarosse", "name": "Bodenblech", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.7", "bereich": "Grundkarosse", "name": "Spritzwand", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.8", "bereich": "Grundkarosse", "name": "Einstieg", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.8", "bereich": "Grundkarosse", "name": "Einstieg", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.8", "bereich": "Grundkarosse", "name": "Einstieg", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.8", "bereich": "Grundkarosse", "name": "Einstieg", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.9", "bereich": "Grundkarosse", "name": "A-Säule rechts", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.10", "bereich": "Grundkarosse", "name": "A-Säule links", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.11", "bereich": "Grundkarosse", "name": "B-Säule rechts", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.12", "bereich": "Grundkarosse", "name": "B-Säule links", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.13", "bereich": "Grundkarosse", "name": "C-Säule rechts", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "13.14", "bereich": "Grundkarosse", "name": "C-Säule links", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "17", "bereich": "Verglasung", "name": "Verglasung", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "17", "bereich": "Verglasung", "name": "Verglasung", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "17", "bereich": "Verglasung", "name": "Verglasung", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "17", "bereich": "Verglasung", "name": "Verglasung", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "17", "bereich": "Verglasung", "name": "Verglasung", "pos": "Front", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "17", "bereich": "Verglasung", "name": "Verglasung", "pos": "Heck", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.1", "bereich": "Beleuchtungsanlage", "name": "Scheinwerfer", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.1", "bereich": "Beleuchtungsanlage", "name": "Scheinwerfer", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.2", "bereich": "Beleuchtungsanlage", "name": "Schlussleuchten", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.2", "bereich": "Beleuchtungsanlage", "name": "Schlussleuchten", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.3", "bereich": "Beleuchtungsanlage", "name": "Rückfahrscheinwerfer", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.4", "bereich": "Beleuchtungsanlage", "name": "Kennzeichenbeleuchtung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.5", "bereich": "Beleuchtungsanlage", "name": "Innenbeleuchtung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.6", "bereich": "Beleuchtungsanlage", "name": "Nebelscheinwerfer", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.6", "bereich": "Beleuchtungsanlage", "name": "Nebelscheinwerfer", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.7", "bereich": "Beleuchtungsanlage", "name": "Nebelschlussleuchte", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.8", "bereich": "Beleuchtungsanlage", "name": "Schalter/Relais/Sicherungen", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "22.9", "bereich": "Beleuchtungsanlage", "name": "Kabelverbindungen", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "23.1", "bereich": "Signalanlage", "name": "Blinker vorn", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "23.1", "bereich": "Signalanlage", "name": "Blinker vorn", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "23.2", "bereich": "Signalanlage", "name": "Blinker hinten", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "23.2", "bereich": "Signalanlage", "name": "Blinker hinten", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "23.3", "bereich": "Signalanlage", "name": "Bremsleuchten", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "23.3", "bereich": "Signalanlage", "name": "Bremsleuchten", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "23.4", "bereich": "Signalanlage", "name": "Signalhorn", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "23.5", "bereich": "Signalanlage", "name": "Warnblinkanlage", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.1", "bereich": "Komfortelektronik", "name": "Airbags/Seitenaufprallschutz", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.2", "bereich": "Komfortelektronik", "name": "ABS", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.3", "bereich": "Komfortelektronik", "name": "Zentralverriegelung", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.4", "bereich": "Komfortelektronik", "name": "elektrische Fensterheber", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.4", "bereich": "Komfortelektronik", "name": "elektrische Fensterheber", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.4", "bereich": "Komfortelektronik", "name": "elektrische Fensterheber", "pos": "HR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.4", "bereich": "Komfortelektronik", "name": "elektrische Fensterheber", "pos": "HL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.5", "bereich": "Komfortelektronik", "name": "Sitzheizung", "pos": "VR", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.5", "bereich": "Komfortelektronik", "name": "Sitzheizung", "pos": "VL", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}, {"id": "24.6", "bereich": "Komfortelektronik", "name": "Bordcomputer", "pos": "", "isHeader": false, "status": "", "conditions": [], "note": "", "fotoNr": ""}];
+var BCOND=[{k:"ok",l:"In Ordnung",c:"#3d7a52"},{k:"fehlt",l:"Fehlt",c:"#c41230"},{k:"defekt",l:"Defekt",c:"#c41230"},{k:"zerstoert",l:"Zerstört",c:"#8a0d22"},{k:"beschaedigt",l:"Beschädigt",c:"#cc9200"},{k:"verbeult",l:"Verbeult",c:"#cc9200"},{k:"Delle",l:"Delle",c:"#cc9200"},{k:"verkratzt",l:"Verkratzt",c:"#996600"},{k:"korrodiert",l:"Korrodiert",c:"#8B4513"},{k:"nachlackiert",l:"Nachlackiert",c:"#7a2acc"},{k:"undicht",l:"Undicht",c:"#2a6acc"},{k:"veroelt",l:"Verölt",c:"#555"},{k:"gerissen",l:"Gerissen",c:"#c41230"},{k:"gebrochen",l:"Gebrochen",c:"#c41230"},{k:"lose",l:"Lose",c:"#cc9200"},{k:"deformiert",l:"Deformiert",c:"#cc9200"},{k:"Original",l:"Original",c:"#0891b2"},{k:"Ersatz",l:"Ersatz",c:"#8a8278"},{k:"instandgesetzt",l:"Instandgesetzt",c:"#2a6acc"}];
+function getBefund(p){
+  if(!p.befund||!p.befund.length){p.befund=BEFUND_TPL.map(function(x){return{id:x.id,bereich:x.bereich,name:x.name,pos:x.pos,status:"",conditions:[],note:"",fotoNr:""};});}
+  return p.befund;
+}
+function befundStats(p){var items=getBefund(p),done=0,issues=0;items.forEach(function(it){if(it.status||it.conditions.length)done++;if(it.conditions.indexOf("ok")<0&&it.conditions.length)issues++;});return{total:items.length,done:done,issues:issues};}
+function setBefCond(pid,idx,cond){
+  var p=getP(pid);if(!p)return;var items=getBefund(p),it=items[idx];if(!it)return;
+  if(cond==="ok"){it.conditions=it.conditions.indexOf("ok")>=0?[]:[cond];it.status=it.conditions.length?"ok":"";}
+  else{var ci=it.conditions.indexOf(cond);if(ci>=0)it.conditions.splice(ci,1);else{it.conditions.push(cond);it.conditions=it.conditions.filter(function(c){return c!=="ok";});}it.status=it.conditions.length?"issues":"";}
+  saveData();var el=E("bfc_"+idx);if(el)el.innerHTML=buildBefConds(it,pid,idx);
+}
+function setBefNote(pid,idx,val){var p=getP(pid);if(p){getBefund(p)[idx].note=val;saveData();}}
+function setBefFoto(pid,idx,val){var p=getP(pid);if(p){getBefund(p)[idx].fotoNr=val;saveData();}}
+function toggleBefRow(id){
+  var el=E(id);if(!el)return;
+  var open=el.style.display==="block";el.style.display=open?"none":"block";
+  var arr=E(id+"_a");if(arr)arr.style.transform=open?"":"rotate(90deg)";
+}
+function toggleBefSec(el){var body=el.nextElementSibling;if(!body)return;body.style.display=body.style.display==="block"?"none":"block";}
+function buildBefConds(it,pid,idx){
+  var s="";
+  BCOND.forEach(function(c){
+    var sel=it.conditions.indexOf(c.k)>=0;
+    s+='<span onclick="setBefCond(\''+pid+'\','+idx+',\''+c.k+'\')" style="cursor:pointer;display:inline-flex;align-items:center;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;margin:2px;background:'+(sel?c.c+'22':'#f5f5f5')+';color:'+(sel?c.c:'#8a8278')+';border:1px solid '+(sel?c.c:'#ddd')+'">'+c.l+'</span>';
+  });
+  return s;
+}
+function vPBF(){
+  var p=curP(),pid=p.id,items=getBefund(p),stats=befundStats(p);
+  var pct=stats.total>0?Math.round(stats.done/stats.total*100):0;
+  var bereiche={},bOrder=[];
+  items.forEach(function(it,i){if(!bereiche[it.bereich]){bereiche[it.bereich]=[];bOrder.push(it.bereich);}bereiche[it.bereich].push({it:it,idx:i});});
+  var secs="";
+  bOrder.forEach(function(b,bi){
+    var bItems=bereiche[b];
+    var bIss=bItems.filter(function(e){return e.it.conditions.indexOf("ok")<0&&e.it.conditions.length;}).length;
+    var bDone=bItems.filter(function(e){return e.it.status||e.it.conditions.length;}).length;
+    var bCol=bIss?"#cc9200":bDone===bItems.length&&bDone>0?"#3d7a52":"#c8c4bc";
+    var rows="";
+    bItems.forEach(function(entry){
+      var it=entry.it,i=entry.idx;
+      var isOk=it.conditions.indexOf("ok")>=0,hasI=!isOk&&it.conditions.length;
+      var dotC=isOk?"#3d7a52":hasI?"#cc9200":"#c8c4bc";
+      var prev="";it.conditions.forEach(function(c){var cf=BCOND.filter(function(x){return x.k===c;})[0];if(cf)prev+='<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:'+cf.c+'22;color:'+cf.c+';border:1px solid '+cf.c+'44">'+cf.l+'</span> ';});
+      rows+='<div style="border-bottom:1px solid #eee;background:#fff;color:#1a1715">'
+        +'<div style="display:flex;align-items:center;gap:8px;padding:7px 0;cursor:pointer;color:#1a1715" data-befrow="bfr'+i+'" onclick="toggleBefRow(this.dataset.befrow)">'
+        +'<span style="width:7px;height:7px;border-radius:50%;background:'+dotC+';display:inline-block;flex-shrink:0"></span>'
+        +'<span style="font-size:11px;font-weight:600;flex:1;color:#1a1715">'+it.id+' '+it.name+(it.pos?' <small style="color:#8a8278">'+it.pos+'</small>':''  )+'</span>'
+        +(it.fotoNr?'<span style="font-size:10px;color:#2a6acc">F:'+it.fotoNr+'</span>':'')
+        +(prev?'<div>'+prev+'</div>':'')
+        +'<span id="bfr'+i+'_a" style="font-size:10px;color:#8a8278;transition:transform .15s">&#9654;</span>'
+        +'</div>'
+        +'<div id="bfr'+i+'" style="display:none;padding:6px 0 10px 16px;background:#fff">'
+        +'<div id="bfc_'+i+'">'+buildBefConds(it,pid,i)+'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:6px">'
+        +'<input class="fi" placeholder="Foto-Nr." value="'+it.fotoNr+'" data-befpid="'+pid+'" data-befidx="'+i+'" data-beft="foto" style="width:80px;font-size:11px;padding:4px 7px">'
+        +'<input class="fi" placeholder="Bemerkungen..." value="'+it.note.replace(/"/g,'&quot;')+'" data-befpid="'+pid+'" data-befidx="'+i+'" data-beft="note" style="flex:1;font-size:11px;padding:4px 7px">'
+        +'</div></div></div>';
+    });
+    secs+='<div style="border:1px solid #d8d4ce;border-radius:6px;margin-bottom:7px;overflow:hidden;background:#fff">'
+      +'<div style="background:#f5f3ef;padding:9px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;color:#1a1715" onclick="toggleBefSec(this)">'
+      +'<span style="width:9px;height:9px;border-radius:50%;background:'+bCol+';flex-shrink:0"></span>'
+      +'<span style="font-weight:600;font-size:12px;flex:1;color:#1a1715">'+b+'</span>'
+      +'<span style="font-size:10px;color:#8a8278">'+bDone+'/'+bItems.length+(bIss?' &bull; <span style="color:#cc9200">'+bIss+' Mängel</span>':'')+'</span>'
+      +'</div><div style="display:none;padding:0 12px;background:#fff">'+rows+'</div></div>';
+  });
+  return pH("f")
+    +'<div class="flex fac fjb mb3" style="flex-wrap:wrap;gap:8px">'
+    +'<div class="g3" style="gap:10px">'
+    +'<div class="stat" style="padding:12px;border-top-color:#0891b2"><div class="sv" style="font-size:20px;color:#0891b2">'+pct+'%</div><div class="sl">Erfasst</div></div>'
+    +'<div class="stat" style="padding:12px;border-top-color:#3d7a52"><div class="sv cg" style="font-size:20px">'+stats.done+'</div><div class="sl">Bewertet</div></div>'
+    +'<div class="stat" style="padding:12px;border-top-color:#cc9200"><div class="sv" style="font-size:20px;color:#cc9200">'+stats.issues+'</div><div class="sl">Mängel</div></div>'
+    +'</div>'
+    +'<div class="flex g2p">'
+    +'<button class="btn btn-g btn-sm" onclick="expandAllBefund()">Alle öffnen</button>'
+    +'<button class="btn btn-p btn-sm" onclick="printBefund(APP.pid)">&#128196; Bericht</button>'
+    +'</div></div>'
+    +'<div class="pg mb3"><div class="pgb" style="background:#0891b2;width:'+pct+'%"></div></div>'
+    +secs+'</div>';
+}
+function printBefund(pid){
+  var p=getP(pid),v=getV(p.vid),items=getBefund(p),stats=befundStats(p);
+  var filled=items.filter(function(it){return it.conditions.length||it.note||it.fotoNr;});
+  var rows=filled.map(function(it){
+    var conds=it.conditions.map(function(c){var cf=BCOND.filter(function(x){return x.k===c;})[0];return cf?cf.l:c;}).join(", ");
+    var col=it.conditions.indexOf("ok")>=0?"#3d7a52":it.conditions.length?"#cc9200":"#999";
+    return '<tr><td style="color:#999;font-size:10px">'+it.id+'</td><td style="font-weight:600">'+it.name+(it.pos?' ('+it.pos+')':"")+'</td><td style="color:#888;font-size:10px">'+it.bereich+'</td><td style="color:'+col+'">'+conds+'</td><td style="font-size:10px">'+it.fotoNr+'</td><td style="font-size:11px;color:#555">'+it.note+'</td></tr>';
+  }).join('');
+  var div=document.createElement("div");div.id="BEFUND-PRINT";
+  div.style.cssText="position:fixed;inset:0;background:#fff;z-index:2000;overflow-y:auto";
+  div.innerHTML='<div style="position:sticky;top:0;background:#1a1715;padding:10px 20px;display:flex;gap:10px">'
+    +'<span style="color:#fff;font-weight:700;flex:1;font-size:13px">Fahrzeugbefund — '+p.name+'</span>'
+    +'<button onclick="window.print()" style="background:#c41230;color:#fff;border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:700">Drucken</button>'
+    +'<button onclick="closeBefundPrint()" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:5px;padding:7px 14px;cursor:pointer;font-size:12px">← Zurück</button>'
+    +'</div><div style="max-width:900px;margin:0 auto;padding:20px;font-family:Arial,sans-serif;font-size:12px">'
+    +'<h1 style="color:#c41230;font-size:18px">Fahrzeugbefund — '+p.name+'</h1>'
+    +'<p style="color:#888;font-size:11px;margin-bottom:16px">'+(v?v.marke+' '+v.modell+' Bj. '+v.baujahr+' | ':'')+stats.done+'/'+stats.total+' bewertet | Mängel: '+stats.issues+' | '+new Date().toLocaleDateString('de-DE')+'</p>'
+    +(rows?'<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f0ede8"><th style="padding:5px;text-align:left;font-size:10px">Nr.</th><th>Bauteil</th><th>Bereich</th><th>Zustand</th><th>Foto</th><th>Bemerkungen</th></tr></thead><tbody>'+rows+'</tbody></table>':'<p>Keine Einträge.</p>')
+    +'<p style="font-size:10px;color:#aaa;margin-top:20px">Riedel classics</p></div>';
+  document.body.appendChild(div);
+}
+
+
+var KZ_UNLOCKED=false;
+function navKZ(){
+  if(KZ_UNLOCKED){nav("kennzahlen");return;}
+  // Show PIN modal
+  var overlay=document.createElement("div");
+  overlay.id="KZ-PIN-OVL";
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:5000;display:flex;align-items:center;justify-content:center";
+  overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:28px 24px;width:300px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)">'
+    +'<div style="font-size:28px;margin-bottom:8px">&#128202;</div>'
+    +'<div style="font-weight:700;font-size:16px;margin-bottom:4px">Kennzahlen</div>'
+    +'<div style="font-size:12px;color:#8a8278;margin-bottom:16px">Bitte PIN eingeben (Chefsache)</div>'
+    +'<input type="password" id="kz-pin-inp" placeholder="PIN" maxlength="8" '
+    +'style="width:100%;border:2px solid #d8d4ce;border-radius:8px;padding:10px;font-size:18px;text-align:center;outline:none;box-sizing:border-box;margin-bottom:12px">'
+    +'<div id="kz-pin-err" style="color:#c41230;font-size:12px;height:16px;margin-bottom:8px"></div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="closeKZPin()" '
+    +'style="flex:1;padding:10px;border:1px solid #d8d4ce;border-radius:6px;background:#fff;cursor:pointer;font-size:13px">Abbrechen</button>'
+    +'<button onclick="checkKZPin()" '
+    +'style="flex:1;padding:10px;border:none;border-radius:6px;background:#c41230;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Öffnen</button>'
+    +'</div></div>';
+  document.body.appendChild(overlay);
+  // Focus and enter key
+  setTimeout(function(){
+    var inp=document.getElementById("kz-pin-inp");
+    if(inp){inp.focus();inp.onkeydown=function(e){if(e.key==="Enter")checkKZPin();};}
+  },100);
+}
+function closeKZPin(){var o=document.getElementById("KZ-PIN-OVL");if(o)o.remove();}
+function checkKZPin(){
+  var inp=document.getElementById("kz-pin-inp");
+  var err=document.getElementById("kz-pin-err");
+  if(!inp)return;
+  var entered=inp.value.trim();
+  var pin=D().settings.kpPin||"0000";
+  if(entered===pin){
+    KZ_UNLOCKED=true;
+    var ovl=document.getElementById("KZ-PIN-OVL");if(ovl)ovl.remove();
+    nav("kennzahlen");
+    toast("Kennzahlen entsperrt ✓","ok");
+  }else{
+    if(err){err.textContent="❌ Falscher PIN";setTimeout(function(){err.textContent="";},2000);}
+    inp.value="";inp.focus();
+  }
+}
+
+function vKZ(){
+  var d=D(),s=d.settings;
+  var bkH=(+(s.miete||0))+(+(s.strom||0))+(+(s.agk||0)); // Betriebskosten/h
+  var ssH=+(s.ss||90); // Stundensatz (Verdienst)
+  var vollH=bkH+ssH; // Vollkosten/h
+
+  var cards="";
+  for(var i=0;i<d.projects.length;i++){
+    var p=d.projects[i],v=getV(p.vid),c=costs(p);
+    var thTotal=c.th; // Gesamtstunden (Tagebuch + Stempeluhr)
+    var bkGes=thTotal*bkH;   // Betriebskosten gesamt
+    var zeitGes=thTotal*ssH; // Zeitkosten (Stundensatz)
+    var vollGes=thTotal*vollH; // Vollkosten gesamt
+    var matGes=c.pk;           // Materialkosten
+    var projektGes=matGes+vollGes; // Gesamtprojektkosten
+
+    // Progress bar Kosten
+    var pct=p.planK>0?Math.round(projektGes/p.planK*100):0;
+    var barCol=pct>110?"#c41230":pct>90?"#cc9200":"#3d7a52";
+
+    cards+="<div class=\"card mb3\" style=\"border-top:4px solid "+barCol+"\">"
+      // Header
+      +"<div class=\"flex fac fjb mb3\">"
+      +"<div><div class=\"ff fw\" style=\"font-size:16px\">"+p.name+"</div>"
+      +"<div class=\"txs cm\">"+(v?v.marke+" "+v.modell+" &bull; Bj. "+v.baujahr:"")
+      +" &bull; "+p.status+"</div></div>"
+      +"<div class=\"flex g2p\"><button class=\"btn btn-p btn-sm\" onclick=\"printKZ('"+p.id+"')\">&#128196; PDF</button></div>"
+      +"</div>"
+      // KPI row
+      +"<div style=\"display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px\">"
+      +"<div style=\"background:#f0ede8;padding:12px;border-radius:6px;text-align:center\">"
+      +"<div class=\"ff fw\" style=\"font-size:18px;color:#0891b2\">"+FMTH(thTotal)+"</div>"
+      +"<div class=\"txs cm\">Gesamtstunden</div></div>"
+      +"<div style=\"background:#fde8ec;padding:12px;border-radius:6px;text-align:center\">"
+      +"<div class=\"ff fw\" style=\"font-size:18px;color:#c41230\">"+FMT_EUR(projektGes)+"</div>"
+      +"<div class=\"txs cm\">Projektgesamtkosten</div></div>"
+      +"<div style=\"background:"+(pct>100?"#fde8ec":"#e6f7ee")+";padding:12px;border-radius:6px;text-align:center\">"
+      +"<div class=\"ff fw\" style=\"font-size:18px;color:"+(pct>100?"#c41230":"#3d7a52")+"\">"+pct+"%</div>"
+      +"<div class=\"txs cm\">Planauslastung</div></div></div>"
+      // Kostenaufstellung
+      +"<div class=\"twrap\"><table style=\"font-size:12px\"><tbody>"
+      +"<tr><td style=\"color:#8a8278;padding:7px 10px\">&#9679; Materialkosten</td>"
+      +"<td style=\"text-align:right;font-weight:600;padding:7px 10px\">"+FMT_EUR(matGes)+"</td>"
+      +"<td style=\"color:#8a8278;padding:7px 10px;font-size:10px\">Ersatzteile &amp; Zukauf</td></tr>"
+      +"<tr style=\"background:#f9f9f9\"><td style=\"color:#8a8278;padding:7px 10px\">&#9679; Zeitkosten (Verdienst)</td>"
+      +"<td style=\"text-align:right;font-weight:600;padding:7px 10px\">"+FMT_EUR(zeitGes)+"</td>"
+      +"<td style=\"color:#8a8278;padding:7px 10px;font-size:10px\">"+FMTH(thTotal)+" &times; "+ssH+"€/h</td></tr>"
+      +"<tr><td style=\"color:#8a8278;padding:7px 10px\">&#9679; Miete</td>"
+      +"<td style=\"text-align:right;padding:7px 10px\">"+FMT_EUR(thTotal*(+(s.miete||0)))+"</td>"
+      +"<td style=\"color:#8a8278;padding:7px 10px;font-size:10px\">"+FMTH(thTotal)+" &times; "+(+(s.miete||0)).toFixed(2)+"€/h</td></tr>"
+      +"<tr style=\"background:#f9f9f9\"><td style=\"color:#8a8278;padding:7px 10px\">&#9679; Strom</td>"
+      +"<td style=\"text-align:right;padding:7px 10px\">"+FMT_EUR(thTotal*(+(s.strom||0)))+"</td>"
+      +"<td style=\"color:#8a8278;padding:7px 10px;font-size:10px\">"+FMTH(thTotal)+" &times; "+(+(s.strom||0)).toFixed(2)+"€/h</td></tr>"
+      +"<tr><td style=\"color:#8a8278;padding:7px 10px\">&#9679; Allg. Kosten (GKV/IHK)</td>"
+      +"<td style=\"text-align:right;padding:7px 10px\">"+FMT_EUR(thTotal*(+(s.agk||0)))+"</td>"
+      +"<td style=\"color:#8a8278;padding:7px 10px;font-size:10px\">"+FMTH(thTotal)+" &times; "+(+(s.agk||0)).toFixed(2)+"€/h</td></tr>"
+      +"<tr style=\"background:#fff3f0;border-top:2px solid #c41230\"><td style=\"padding:9px 10px;font-weight:700\">Gesamtkosten Projekt</td>"
+      +"<td style=\"text-align:right;font-weight:700;color:#c41230;padding:9px 10px;font-size:14px\">"+FMT_EUR(projektGes)+"</td>"
+      +"<td style=\"color:#8a8278;padding:9px 10px;font-size:10px\">Plan: "+FMT_EUR(p.planK)+"</td></tr>"
+      +"</tbody></table></div>"
+      // Vollkosten vs Stundensatz info
+      +"<div style=\"margin-top:10px;padding:8px 12px;background:#f0ede8;border-radius:5px;font-size:11px;color:#4a4540\">"
+      +"&#128161; Vollkosten/h: "+FMT_EUR(vollH)+" &nbsp;|&nbsp; Betriebskosten/h: "+FMT_EUR(bkH)
+      +" &nbsp;|&nbsp; Stundensatz: "+FMT_EUR(ssH)
+      +"</div></div>";
+  }
+
+  // Summary across all projects
+  var totH=0,totBK=0,totZeit=0,totMat=0;
+  for(var i=0;i<d.projects.length;i++){var c=costs(d.projects[i]);totH+=c.th;totMat+=c.pk;totZeit+=c.th*ssH;totBK+=c.th*bkH;}
+  var totGes=totMat+totZeit+totBK;
+
+  return "<div class=\"page\">"
+    +"<div class=\"flex fac fjb mb3\">"
+    +"<div><div class=\"pt\">&#128202; Projektkennzahlen</div>"
+    +"<div class=\"ps\">Vollkostenrechnung &bull; vertraulich</div></div>"
+    +"<button class=\"btn btn-g btn-sm\" onclick=\"KZ_UNLOCKED=false;nav('projects')\">&#128274; Sperren</button>"
+    +"</div>"
+    // Summary card
+    +"<div class=\"card mb3\" style=\"border-top:4px solid #1a1715\">"
+    +"<div class=\"fw tsm mb3\">Gesamtauswertung alle Projekte</div>"
+    +"<div style=\"display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px\">"
+    +"<div style=\"text-align:center;padding:10px;background:#f0ede8;border-radius:6px\">"
+    +"<div class=\"ff fw cr\" style=\"font-size:17px\">"+FMTH(totH)+"</div><div class=\"txs cm\">Gesamtstunden</div></div>"
+    +"<div style=\"text-align:center;padding:10px;background:#e6f0fc;border-radius:6px\">"
+    +"<div class=\"ff fw cb\" style=\"font-size:17px\">"+FMT_EUR(totMat)+"</div><div class=\"txs cm\">Material</div></div>"
+    +"<div style=\"text-align:center;padding:10px;background:#e6f7ee;border-radius:6px\">"
+    +"<div class=\"ff fw cg\" style=\"font-size:17px\">"+FMT_EUR(totZeit)+"</div><div class=\"txs cm\">Zeitverdienst</div></div>"
+    +"<div style=\"text-align:center;padding:10px;background:#fde8ec;border-radius:6px\">"
+    +"<div class=\"ff fw cr\" style=\"font-size:17px\">"+FMT_EUR(totGes)+"</div><div class=\"txs cm\">Gesamtkosten</div></div>"
+    +"</div>"
+    +"<div style=\"padding:8px 12px;background:#f0ede8;border-radius:5px;font-size:11px\">"
+    +"Vollkostenrate: "+FMT_EUR(vollH)+"/h &nbsp;(Betrieb: "+FMT_EUR(bkH)+"/h + Stundensatz: "+FMT_EUR(ssH)+"/h)"
+    +"</div></div>"
+    // Per project
+    +cards+"</div>";
+}
+
+function printKZ(pid){
+  var d=D(),s=d.settings,p=getP(pid),v=getV(p.vid),c=costs(p);
+  var bkH=(+(s.miete||0))+(+(s.strom||0))+(+(s.agk||0));
+  var ssH=+(s.ss||90),vollH=bkH+ssH,thTotal=c.th;
+  var matGes=c.pk,zeitGes=thTotal*ssH,bkGes=thTotal*bkH,vollGes=thTotal*vollH,projektGes=matGes+vollGes;
+  var pct=p.planK>0?Math.round(projektGes/p.planK*100):0;
+  var html="<!DOCTYPE html><html><head><meta charset='UTF-8'>"
+    +"<title>Kennzahlen "+p.name+"</title>"
+    +"<style>body{font-family:Arial,sans-serif;font-size:12px;margin:15mm}"
+    +"h1{color:#c41230;font-size:18px}h2{font-size:13px;border-bottom:2px solid #c41230;padding-bottom:4px;margin:16px 0 8px}"
+    +"table{width:100%;border-collapse:collapse}th{background:#f0ede8;padding:6px;text-align:left;font-size:10px}"
+    +"td{padding:7px 8px;border-bottom:1px solid #eee}.kpi{background:#f5f5f5;padding:12px;border-radius:6px;margin:4px}"
+    +".kv{font-size:22px;font-weight:700;color:#c41230}.warn{color:#c41230;font-weight:bold}"
+    +"</style></head><body>"
+    +"<div style='background:#1a1715;color:#fff;padding:10px 16px;border-radius:6px;margin-bottom:16px;font-size:10px;letter-spacing:1px'>VERTRAULICH &bull; PROJEKTKENNZAHLEN &bull; CHEFSACHE</div>"
+    +"<h1>Projektkennzahlen &mdash; "+p.name+"</h1>"
+    +"<p style='color:#888;font-size:11px'>"+(v?v.marke+" "+v.modell+" &bull; Bj "+v.baujahr+" &bull; ":"")+p.status+" &bull; "+new Date().toLocaleDateString('de-DE')+"</p>"
+    +"<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0'>"
+    +"<div class='kpi'><div class='kv'>"+FMTH(thTotal)+"</div><div>Gesamtstunden</div></div>"
+    +"<div class='kpi'><div class='kv'>"+FMT_EUR(projektGes)+"</div><div>Projektgesamtkosten</div></div>"
+    +"<div class='kpi'><div class='kv "+(pct>100?"warn":"")+"'>"+pct+"%</div><div>Planauslastung</div></div>"
+    +"</div>"
+    +"<h2>Kostenaufstellung</h2>"
+    +"<table><thead><tr><th>Position</th><th>Menge</th><th>Satz</th><th style='text-align:right'>Betrag</th></tr></thead><tbody>"
+    +"<tr><td>Materialkosten (Ersatzteile)</td><td>&mdash;</td><td>&mdash;</td><td style='text-align:right'>"+FMT_EUR(matGes)+"</td></tr>"
+    +"<tr style='background:#f9f9f9'><td>Zeitkosten (Stundensatz)</td><td>"+FMTH(thTotal)+"</td><td>"+ssH+"&euro;/h</td><td style='text-align:right'>"+FMT_EUR(zeitGes)+"</td></tr>"
+    +"<tr><td>Miete</td><td>"+FMTH(thTotal)+"</td><td>"+(+(s.miete||0)).toFixed(2)+"&euro;/h</td><td style='text-align:right'>"+FMT_EUR(thTotal*(+(s.miete||0)))+"</td></tr>"
+    +"<tr style='background:#f9f9f9'><td>Strom</td><td>"+FMTH(thTotal)+"</td><td>"+(+(s.strom||0)).toFixed(2)+"&euro;/h</td><td style='text-align:right'>"+FMT_EUR(thTotal*(+(s.strom||0)))+"</td></tr>"
+    +"<tr><td>Allg. Kosten (GKV/IHK/BG)</td><td>"+FMTH(thTotal)+"</td><td>"+(+(s.agk||0)).toFixed(2)+"&euro;/h</td><td style='text-align:right'>"+FMT_EUR(thTotal*(+(s.agk||0)))+"</td></tr>"
+    +"<tr style='background:#fff3f0;font-weight:700;border-top:2px solid #c41230'><td>GESAMTKOSTEN</td><td colspan='2'>Plan: "+FMT_EUR(p.planK)+"</td><td style='text-align:right;font-size:15px;color:#c41230'>"+FMT_EUR(projektGes)+"</td></tr>"
+    +"</tbody></table>"
+    +"<div style='margin-top:16px;padding:10px;background:#f0ede8;border-radius:5px;font-size:11px'>"
+    +"Vollkostenrate: "+FMT_EUR(vollH)+"/h (Betrieb: "+FMT_EUR(bkH)+"/h + Stundensatz: "+FMT_EUR(ssH)+"/h)"
+    +"</div>"
+    +"<p style='font-size:9px;color:#bbb;margin-top:20px'>Riedel classics Restauration Manager &bull; "+new Date().toLocaleDateString('de-DE')+" &bull; VERTRAULICH</p>"
+    +"</body></html>";
+  var div=document.createElement("div");div.id="KZ-PRINT";
+  div.style.cssText="position:fixed;inset:0;background:#fff;z-index:2000;overflow-y:auto";
+  div.innerHTML="<div style='position:sticky;top:0;background:#1a1715;padding:10px 20px;display:flex;gap:10px'>"
+    +"<span style='color:#fff;font-weight:700;flex:1'>Kennzahlen &mdash; "+p.name+"</span>"
+    +"<button onclick='window.print()' style='background:#c41230;color:#fff;border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:700'>Drucken</button>"
+    +"<button onclick='document.getElementById(\"KZ-PRINT\").remove()' style='background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:5px;padding:7px 14px;cursor:pointer;font-size:12px'>\u2190 Zur\u00fcck</button>"
+    +"</div><div style='max-width:800px;margin:0 auto;padding:20px;font-family:Arial,sans-serif'>"+html.replace(/.*<body>/s,"").replace(/<\/body>.*/s,"")+"</div>";
+  document.body.appendChild(div);
+}
+
+function vRep(){
+  var d=D();
+  var projOpts='<option value="">-- Alle Projekte --</option>';
+  for(var i=0;i<d.projects.length;i++){var p=d.projects[i],v=getV(p.vid);projOpts+='<option value="'+p.id+'">'+p.name+(v?' ('+v.modell+')':"")+'</option>';}
+  return "<div class=\"page\"><div class=\"pt mb3\">&#128196; Berichte</div>"
+    +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128196; Schnellberichte (PDF)</div>"
+    +"<div style=\"display:flex;flex-direction:column;gap:6px\">"
+    +d.projects.map(function(p){var v=getV(p.vid);
+      return "<div class=\"flex fac fjb\" style=\"padding:8px 12px;background:var(--bg);border-radius:6px\">"
+        +"<div><div class=\"tsm fw\">"+p.name+"</div>"+(v?"<div class=\"txs cm\">"+v.marke+" "+v.modell+"</div>":"")+"</div>"
+        +"<button class=\"btn btn-p btn-sm\" data-action=\"printRep\" data-id=\""+p.id+"\">&#128196; PDF</button>"
+        +"</div>";}).join("")
+    +"</div></div>"
+    +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128202; Aufwandsanalyse</div>"
+    +"<div class=\"frow mb3\">"
+    +"<div class=\"fg\"><label class=\"fl\">Projekt</label><select class=\"fsel\" id=\"rep-proj\" onchange=\"renderRepAnalyse()\">"+projOpts+"</select></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Auswertung</label><select class=\"fsel\" id=\"rep-type\" onchange=\"renderRepAnalyse()\">"
+    +"<option value=\"arbeitsgang\">Nach Arbeitsgang</option>"
+    +"<option value=\"mitarbeiter\">Nach Mitarbeiter</option>"
+    +"<option value=\"monat\">Nach Monat</option>"
+    +"<option value=\"projekt\">Projektvergleich</option>"
+    +"</select></div></div>"
+    +"<div id=\"rep-result\"></div></div></div>";
+}
+
+function renderRepAnalyse(){
+  var projId=GV("rep-proj"),type=GV("rep-type"),el=E("rep-result");if(!el)return;
+  var entries=[];
+  if(projId){
+    var p=getP(projId);if(p){
+      entries=getSMPTime(p.smpProj||p.name).slice();
+      for(var i=0;i<p.tagebuch.length;i++){var tb=p.tagebuch[i];if(tb.zeit>0)entries.push({date:tb.datum,dur:tb.zeit*3600000,pay:tb.zeit*(p.ss||90),proj:p.name,note:tb.info,_isCR:true});}
+    }
+  }else{
+    entries=APP.smp.zeit.slice();
+    var d2=D();for(var pi=0;pi<d2.projects.length;pi++){var proj=d2.projects[pi];for(var i=0;i<proj.tagebuch.length;i++){var tb=proj.tagebuch[i];if(tb.zeit>0)entries.push({date:tb.datum,dur:tb.zeit*3600000,pay:tb.zeit*(proj.ss||90),proj:proj.name,note:tb.info,_isCR:true});}}
+  }
+  if(!entries.length){el.innerHTML='<div class="empty"><p>Keine Daten.</p></div>';return;}
+  var groups={};
+  entries.forEach(function(e){
+    var key="";
+    if(type==="arbeitsgang"){var n=(e.note||"").split(" – ")[0].replace(/\[[^\]]+\]$/,"").trim();key=n||"Sonstiges";}
+    else if(type==="mitarbeiter"){var ma=(e.note||"").match(/\[([^\]]+)\]$/);key=ma?ma[1].trim():(e._isCR?"Tagebuch":"Unbekannt");}
+    else if(type==="monat"){key=(e.date||"").slice(0,7)||"?";}
+    else{key=e.proj||"kein Projekt";}
+    if(!groups[key])groups[key]={h:0,pay:0,cnt:0};
+    groups[key].h+=(e.dur||0)/3600000;groups[key].pay+=parseFloat(e.pay)||0;groups[key].cnt++;
+  });
+  var totalH=0,totalPay=0;
+  var keys=Object.keys(groups).sort(function(a,b){return groups[b].pay-groups[a].pay;});
+  keys.forEach(function(k){totalH+=groups[k].h;totalPay+=groups[k].pay;});
+  var maxPay=keys.length?groups[keys[0]].pay:1;
+  var rows=keys.map(function(k,i){
+    var g=groups[k],bw=maxPay>0?Math.round(g.pay/maxPay*100):0,pct=totalPay>0?Math.round(g.pay/totalPay*100):0;
+    return "<tr><td style=\"font-weight:600\">"+(i+1)+"</td><td>"+k+"</td>"
+      +"<td style=\"color:#0891b2;font-weight:700\">"+FMTH(g.h)+"</td>"
+      +"<td style=\"color:var(--green2);font-weight:700\">"+FMT_EUR(g.pay)+"</td>"
+      +"<td>"+g.cnt+"</td>"
+      +"<td><div style=\"display:flex;align-items:center;gap:4px\">"
+      +"<div style=\"height:8px;border-radius:4px;background:#0891b2;width:"+bw+"px;min-width:2px\"></div>"
+      +"<span style=\"font-size:10px;color:var(--text3)\">"+pct+"%</span></div></td></tr>";
+  }).join("");
+  var lbl={arbeitsgang:"Arbeitsgang",mitarbeiter:"Mitarbeiter",monat:"Monat",projekt:"Projekt"}[type];
+  el.innerHTML="<div class=\"flex fac fjb mb2\"><span class=\"tsm fw\">"+lbl+" — "+keys.length+" Gruppen</span>"
+    +"<button class=\"btn btn-g btn-sm\" onclick=\"exportRepCSV()\">&#128229; CSV</button></div>"
+    +"<div class=\"twrap\"><table><thead><tr><th>#</th><th>"+lbl+"</th><th>Stunden</th><th>Betrag</th><th>Eintr.</th><th>Anteil</th></tr></thead>"
+    +"<tbody>"+rows+"</tbody><tfoot><tr style=\"background:var(--bg)\">"
+    +"<td colspan=\"2\" style=\"font-weight:600\">Gesamt</td>"
+    +"<td style=\"font-weight:700;color:#0891b2\">"+FMTH(totalH)+"</td>"
+    +"<td style=\"font-weight:700;color:var(--green2)\">"+FMT_EUR(totalPay)+"</td>"
+    +"<td style=\"color:var(--text3)\">"+entries.length+"</td><td></td>"
+    +"</tr></tfoot></table></div>";
+  window._repData={groups:groups,keys:keys,type:type,totalH:totalH,totalPay:totalPay};
+}
+function exportRepCSV(){
+  if(!window._repData)return;
+  var d=window._repData;
+  var lines=["Gruppe;Stunden;Betrag;Eintraege"];
+  d.keys.forEach(function(k){var g=d.groups[k];lines.push('"'+k+'";'+g.h.toFixed(2)+';'+g.pay.toFixed(2)+';'+g.cnt);});
+  lines.push('"Gesamt";'+d.totalH.toFixed(2)+';'+d.totalPay.toFixed(2)+';');
+  var blob=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"});
+  var url=URL.createObjectURL(blob);var a=document.createElement("a");
+  a.href=url;a.download="bericht-"+TODAY()+".csv";
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  toast("CSV exportiert \u2713","ok");
+}
+function vSet(){
+  var d=D();
+  if(!d.arbeitsgaenge)d.arbeitsgaenge=[];
+  if(!d.mitarbeiter)d.mitarbeiter=[];
+  var agRows="";
+  for(var i=0;i<(d.arbeitsgaenge||[]).length;i++){
+    var ag=d.arbeitsgaenge[i];
+    agRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)\">"
+      +"<span style=\"flex:1;font-size:13px\">"+ag.name+"</span>"
+      +"<span class=\"txs cm\" style=\"margin-right:6px\">"+ag.rolle+"</span>"
+      +"<span class=\"badge b-blue\" style=\"margin-right:8px\">"+ag.rate+" €/h</span>"
+      +"<button class=\"bic\" onclick=\"delAG("+i+")\">&#128465;</button></div>";
+  }
+  var maRows="";
+  for(var i=0;i<(d.mitarbeiter||[]).length;i++){
+    var ma=d.mitarbeiter[i];
+    maRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)\">"
+      +"<span style=\"flex:1;font-size:13px\">"+ma.name+"</span>"
+      +"<span class=\"txs cm\" style=\"margin-right:8px\">"+ma.rolle+"</span>"
+      +"<button class=\"bic\" onclick=\"delMA("+i+")\">&#128465;</button></div>";
+  }
+  return "<div class=\"page\"><div class=\"pt mb3\">Stammdaten &amp; Einstellungen</div>"
+    // Mandant
+    +"<div class=\"card mb3\"><div class=\"flex fac fjb mb3\"><span class=\"fw tsm\">&#127968; Mandant</span>"
+    +"<span class=\"badge b-red\">"+MANDANT+"</span></div>"
+    +"<div style=\"background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px;font-size:10px;font-family:monospace;word-break:break-all;margin-bottom:10px\">"
+    +window.location.origin+window.location.pathname+"?mandant="+MANDANT
+    +"</div>"
+    +"<div class=\"frow mb2\"><div class=\"fg\"><label class=\"fl\">Anderen Mandant öffnen</label>"
+    +"<input class=\"fi\" id=\"new-mandant\" placeholder=\"z.B. mueller, werkstatt2\"></div></div>"
+    +"<button class=\"btn btn-p btn-sm\" onclick=\"openMandant()\">&#127279; Mandant wechseln</button></div>"
+    // Passwort
+    +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128272; Passwort</div>"
+    +"<div class=\"fg\"><label class=\"fl\">Aktuelles Passwort</label><input type=\"password\" class=\"fi\" id=\"s-cpw\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Neues Passwort</label><input type=\"password\" class=\"fi\" id=\"s-npw\"></div>"
+    +"<button class=\"btn btn-p btn-sm\" data-action=\"savePW\">Speichern</button></div>"
+    // Kennzahlen PIN
+    +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128272; Kennzahlen-PIN (Chefsache)</div>"
+    +"<div class=\"tsm cm mb2\">Separater PIN für den Kennzahlen-Bereich (Standard: 0000)</div>"
+    +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Neuer Kennzahlen-PIN</label>"
+    +"<input type=\"password\" class=\"fi\" id=\"kp-pin\" placeholder=\"PIN (4-8 Stellen)\"></div></div>"
+    +"<button class=\"btn btn-p btn-sm\" onclick=\"saveKPPin()\">Speichern</button></div>"
+    // Stundensatz Standard
+    +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128176; Standard-Stundensatz (€/h)</div>"
+    +"<div class=\"fg\"><input type=\"number\" class=\"fi\" id=\"s-ss\" value=\""+d.settings.ss+"\"></div>"
+    +"<button class=\"btn btn-p btn-sm\" data-action=\"saveSS\">Speichern</button></div>"
+    // Arbeitsgänge
+    +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#9881; Arbeitsgänge &amp; Stundensätze</div>"
+    +(agRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+agRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Arbeitsgänge.</p>")
+    +"<div class=\"frow3 mb2\">"
+    +"<div class=\"fg\"><label class=\"fl\">Bezeichnung</label><input class=\"fi\" id=\"ag-name\" placeholder=\"z.B. Mechanik\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ag-rolle\" placeholder=\"z.B. Kfz-Meister\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">€/h</label><input class=\"fi\" type=\"number\" id=\"ag-rate\" value=\"90\"></div>"
+    +"</div><button class=\"btn btn-p btn-sm\" onclick=\"addAG()\">+ Arbeitsgang hinzufügen</button></div>"
+    // Mitarbeiter
+    +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128101; Mitarbeiter</div>"
+    +(maRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+maRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Mitarbeiter.</p>")
+    +"<div class=\"frow mb2\">"
+    +"<div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\" placeholder=\"Name\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ma-rolle\" placeholder=\"z.B. Mechaniker\"></div></div>"
+    +"<button class=\"btn btn-p btn-sm\" onclick=\"addMA()\">+ Mitarbeiter hinzufügen</button></div>"
+    // Speicher
+    // Betriebskosten
+    +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#127970; Betriebskosten pro Arbeitsstunde</div>"
+    +"<div class=\"tsm cm mb3\">Diese Werte fließen in die Projektkennzahlen ein.</div>"
+    +"<div class=\"frow3\">"
+    +"<div class=\"fg\"><label class=\"fl\">Miete (€/h)</label>"
+    +"<input type=\"number\" class=\"fi\" id=\"bk-miete\" value=\""+d.settings.miete+"\" step=\"0.1\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Strom (€/h)</label>"
+    +"<input type=\"number\" class=\"fi\" id=\"bk-strom\" value=\""+d.settings.strom+"\" step=\"0.1\"></div>"
+    +"<div class=\"fg\"><label class=\"fl\">Allg. Kosten GKV/IHK (€/h)</label>"
+    +"<input type=\"number\" class=\"fi\" id=\"bk-agk\" value=\""+d.settings.agk+"\" step=\"0.1\"></div>"
+    +"</div>"
+    +"<div class=\"tsm cm mt2 mb3\">Gesamtkostenrate: <strong class=\"cr\">"+(+(d.settings.miete||0)+ +(d.settings.strom||0)+ +(d.settings.agk||0)).toFixed(2)+"€/h</strong> &nbsp;(+ Stundensatz "+d.settings.ss+"€/h = <strong>"+(+(d.settings.miete||0)+ +(d.settings.strom||0)+ +(d.settings.agk||0)+d.settings.ss).toFixed(2)+"€/h Vollkosten)</div>"
+    +"<button class=\"btn btn-p btn-sm\" onclick=\"saveBK()\">Speichern</button></div>"
+    +"<div class=\"card mb3\"><div class=\"flex fac fjb mb2\">"
+    +"<span class=\"fw tsm\">&#128190; Speicher-Verwaltung</span>"
+    +"<span id=\"stor-size\" class=\"txs cm\">...</span></div>"
+    +"<div class=\"flex g2p\">"
+    +"<button class=\"btn btn-g btn-sm\" onclick=\"checkStorageUsage()\">Prüfen</button>"
+    +"<button class=\"btn btn-p btn-sm\" onclick=\"cleanStorage()\">Bereinigen</button>"
+    +"<button class=\"btn btn-g btn-sm\" onclick=\"stripVehiclePhotos()\">Fotos löschen</button>"
+    +"</div></div>"
+    // SMP Import
+    +"<div class=\"card\"><div class=\"fw tsm mb3\">&#9203; SMP Backup importieren</div>"
+    +"<label class=\"btn btn-g btn-sm\" style=\"cursor:pointer\">&#128228; SMP Backup laden"
+    +"<input type=\"file\" accept=\".json\" style=\"display:none\" onchange=\"doImport(event)\"></label>"
+    +"</div></div>";
+}
+function addAG(){
+  var name=(E("ag-name")||{value:""}).value.trim();
+  var rolle=(E("ag-rolle")||{value:""}).value.trim();
+  var rate=parseFloat((E("ag-rate")||{value:"90"}).value)||90;
+  if(!name){toast("Name fehlt","err");return;}
+  if(!APP.data.arbeitsgaenge)APP.data.arbeitsgaenge=[];
+  APP.data.arbeitsgaenge.push({name:name,rolle:rolle,rate:rate});
+  saveData();render();toast("Arbeitsgang gespeichert \u2713","ok");
+}
+function delAG(i){if(!confirm("L\u00f6schen?"))return;APP.data.arbeitsgaenge.splice(i,1);saveData();render();}
+function addMA(){
+  var name=(E("ma-name")||{value:""}).value.trim();
+  var rolle=(E("ma-rolle")||{value:""}).value.trim();
+  if(!name){toast("Name fehlt","err");return;}
+  if(!APP.data.mitarbeiter)APP.data.mitarbeiter=[];
+  APP.data.mitarbeiter.push({name:name,rolle:rolle});
+  saveData();render();toast("Mitarbeiter gespeichert \u2713","ok");
+}
+function delMA(i){if(!confirm("L\u00f6schen?"))return;APP.data.mitarbeiter.splice(i,1);saveData();render();}
+
+
+function saveBK(){
+  var d=D();
+  d.settings.miete=parseFloat(document.getElementById('bk-miete').value)||0;
+  d.settings.strom=parseFloat(document.getElementById('bk-strom').value)||0;
+  d.settings.agk=parseFloat(document.getElementById('bk-agk').value)||0;
+  saveData();render();toast("Betriebskosten gespeichert \u2713","ok");
+}
+function saveKPPin(){
+  var pin=(document.getElementById('kp-pin')||{value:""}).value.trim();
+  if(!pin||pin.length<4){toast("PIN mind. 4 Stellen","err");return;}
+  D().settings.kpPin=pin;saveData();toast("Kennzahlen-PIN gespeichert \u2713","ok");
+}
+
+function savePW(){var cpw=GV("s-cpw"),npw=GV("s-npw");if(cpw!==D().settings.password){toast("Aktuelles Passwort falsch.","err");return;}if(!npw){toast("Passwort fehlt.","err");return;}D().settings.password=npw;saveData();toast("Passwort ge\u00e4ndert \u2713","ok");}
+function saveSS(){var ss=GF("s-ss");if(ss>0){D().settings.ss=ss;saveData();toast("Gespeichert \u2713","ok");}}
+
+// ── EVENT DELEGATION ───────────────────────────────────────────────
+document.addEventListener("click",function(e){
+  var t=e.target;
+  while(t&&t!==document.body){
+    if(t.classList&&t.classList.contains("ni")){var dv=t.getAttribute("data-v");if(dv&&dv!==""){nav(dv);return;}else if(!dv||dv===""){return;}} // ni without data-v handled by onclick
+    var a=t.getAttribute?t.getAttribute("data-action"):null;
+    if(a){
+      var id=t.getAttribute("data-id")||"",id2=t.getAttribute("data-id2")||"";
+      if(a==="nav")nav(id,id2||undefined);
+      else if(a==="navp"){nav(id,id2);}
+      else if(a==="openVM")openVM(id);else if(a==="delV")delV(id);
+      else if(a==="openPM")openPM(id);else if(a==="delPrj")delPrj(id);
+      else if(a==="openUC")openUC(id);
+      else if(a==="openGM")openGM(id);else if(a==="delG")delG(id);
+      else if(a==="togG")togG(id);else if(a==="togAll")togAll();
+      else if(a==="useGV")useGV(id);
+      else if(a==="editGV")editGV(id);else if(a==="delGV")delGV(id);
+      else if(a==="openIM")openIM(id,id2);else if(a==="delI")delI(id,id2);
+      else if(a==="openDM")openDM(id);else if(a==="delD")delD(id);
+      else if(a==="openTM")openTM(id);else if(a==="delT")delT(id);
+      else if(a==="openBM")openBM(id);else if(a==="delB")delB(id);
+      else if(a==="selPS")selPS(id);
+      else if(a==="fParts"){APP.pf=id;render();}
+      else if(a==="lbox")lbox(id);
+      else if(a==="closeM")closeM();
+      else if(a==="saveV")saveV(id);else if(a==="saveP")saveP(id);
+      else if(a==="saveUC")saveUC(id);
+      else if(a==="saveG")saveG(id);else if(a==="saveI")saveI(id,id2);
+      else if(a==="saveDM")saveDM(id);
+      else if(a==="saveT")saveT(id);else if(a==="saveB")saveB(id);
+      else if(a==="saveGV")saveGV(id);
+      else if(a==="printRep")printRep(id);
+      else if(a==="savePW")savePW();else if(a==="saveSS")saveSS();
+      else if(a==="exportData")exportData();
+      else if(a==="importSMP")importSMP();
+      else if(a==="delSMPEntry"){
+        if(!confirm("Zeiteintrag l\u00f6schen?"))return;
+        APP.smp.zeit=APP.smp.zeit.filter(function(e){return e.id!==id;});
+        saveData();render();toast("Gel\u00f6scht.");
+      }
+      return;
+    }
+    // Befund condition click (check BEFORE moving to parent)
+    if(t&&t.getAttribute){
+      var bpid2=t.getAttribute("data-befpid");
+      var bcond2=t.getAttribute("data-beftcond");
+      if(bpid2&&bcond2){setBefCond(bpid2,parseInt(t.getAttribute("data-befidx")),bcond2);return;}
+    }
+    t=t.parentElement;
+  }
+});document.addEventListener("input",function(e){
+  if(e.target&&e.target.id==="PSRCH"){APP.ps=e.target.value;render();return;}
+  var t=e.target;
+  var bft=t.getAttribute&&t.getAttribute("data-beft");
+  if(bft){var bpid=t.getAttribute("data-befpid"),bidx=parseInt(t.getAttribute("data-befidx"));
+    if(bft==="note")setBefNote(bpid,bidx,t.value);
+    else if(bft==="foto")setBefFoto(bpid,bidx,t.value);}
+});
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM();});
+
+// ── STARTUP ────────────────────────────────────────────────────────
+
+function compressImg(dataUrl,callback,maxW,maxH,quality){
+  maxW=maxW||1200;maxH=maxH||900;quality=quality||0.72;
+  if(!dataUrl||dataUrl.indexOf("image/")<0){callback(dataUrl);return;}
+  var img=new Image();
+  img.onload=function(){
+    var w=img.width,h2=img.height;
+    if(w>maxW||h2>maxH){var rat=Math.min(maxW/w,maxH/h2);w=Math.round(w*rat);h2=Math.round(h2*rat);}
+    var cv=document.createElement("canvas");cv.width=w;cv.height=h2;
+    cv.getContext("2d").drawImage(img,0,0,w,h2);
+    callback(cv.toDataURL("image/jpeg",quality));
+  };
+  img.onerror=function(){callback(dataUrl);};img.src=dataUrl;
+}
+function storageSizeMB(){try{return(((localStorage.getItem(CR_KEY)||"").length+(localStorage.getItem(SMP_KEY)||"").length)/1024/1024).toFixed(2);}catch(e){return"?";}}
+function checkStorageUsage(){
+  var crMB=((localStorage.getItem(CR_KEY)||"").length/1024/1024).toFixed(2);
+  var smpMB=((localStorage.getItem(SMP_KEY)||"").length/1024/1024).toFixed(2);
+  var tot=(parseFloat(crMB)+parseFloat(smpMB)).toFixed(2);
+  var el=E("stor-size");
+  if(el)el.innerHTML="<strong>"+tot+"MB</strong>/5MB &bull; CR:"+crMB+"MB &bull; SMP:"+smpMB+"MB";
+  if(parseFloat(crMB)>2)toast("CR "+crMB+"MB \u2014 Bereinigen empfohlen!","err");
+  else toast("Speicher: "+tot+"MB","ok");
+}
+function cleanStorage(){
+  try{
+    var c={vehicles:APP.data.vehicles,projects:APP.data.projects,gruppenVorlagen:APP.data.gruppenVorlagen,
+           settings:APP.data.settings,arbeitsgaenge:APP.data.arbeitsgaenge,mitarbeiter:APP.data.mitarbeiter};
+    var cj=JSON.stringify(c);localStorage.setItem(CR_KEY,cj);
+    var sf={zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[],kw:[],proj:[],auf:[],id:[]};
+    localStorage.setItem(SMP_KEY,JSON.stringify(sf));
+    localStorage.setItem(CR_KEY+"_ts",new Date().toISOString());
+    toast("Bereinigt: CR="+Math.round(cj.length/1024)+"KB","ok");
+    setTimeout(checkStorageUsage,300);
+  }catch(e){toast("Fehler: "+e.message,"err");}
+}
+function stripVehiclePhotos(){
+  if(!confirm("Alle Fahrzeug-Fotos l\u00f6schen?"))return;
+  var n=0;for(var i=0;i<APP.data.vehicles.length;i++){var v=APP.data.vehicles[i];n+=(v.bild||[]).length+(v.untB||[]).length+(v.untA||[]).length+(v.dok||[]).length;v.bild=[];v.untB=[];v.untA=[];v.dok=[];}
+  cleanStorage();toast(n+" Fotos gel\u00f6scht","ok");
+}
+function openMandant(){
+  var m=(E("new-mandant")||{value:""}).value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,"");
+  if(!m){toast("Bitte Mandant-ID eingeben","err");return;}
+  window.location.href=window.location.origin+window.location.pathname+"?mandant="+m;
+}
+function initLogin(){
+  try{if(sessionStorage.getItem("auth_"+MANDANT)==="1")return;}catch(e){}
+  var el=E("LOGIN");if(el)el.style.display="flex";
+  var sl=document.querySelector(".s-logo img");var ll=E("login-logo");if(sl&&ll)ll.src=sl.src;
+  var lm=E("login-mandant");if(lm)lm.textContent=MANDANT==="default"?"Riedel classics":"Mandant: "+MANDANT;
+  var pw=E("login-pw");if(pw){pw.focus();pw.onkeydown=function(e){if(e.key==="Enter")doLogin();};}
+}
+function doLogin(){
+  var pw=GV("login-pw"),correct=(D().settings&&D().settings.password)||"1234";
+  if(pw===correct){
+    var el=E("LOGIN");if(el)el.style.display="none";
+    try{sessionStorage.setItem("auth_"+MANDANT,"1");}catch(e){}
+  }else{
+    var err=E("login-err");if(err){err.textContent="\u274C Falsches Passwort";setTimeout(function(){err.textContent="";},2000);}
+    var pe=E("login-pw");if(pe)pe.value="";
+  }
+}
+function doLogout(){
+  try{sessionStorage.removeItem("auth_"+MANDANT);}catch(e){}
+  var el=E("LOGIN");if(el)el.style.display="flex";
+  var pe=E("login-pw");if(pe){pe.value="";pe.focus();}
+}
+function closeBefundPrint(){var el=E("BEFUND-PRINT");if(el)el.remove();}
+function expandAllBefund(){document.querySelectorAll('[id^="bsec"]').forEach(function(s){s.style.display="block";});}
+
+
+function exportData(){
+  var backup={version:"3.1",mandant:MANDANT,exported:new Date().toISOString(),
+    cr:{vehicles:APP.data.vehicles,projects:APP.data.projects,
+        gruppenVorlagen:APP.data.gruppenVorlagen,settings:APP.data.settings,
+        arbeitsgaenge:APP.data.arbeitsgaenge,mitarbeiter:APP.data.mitarbeiter},
+    smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],
+         arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[]}};
+  var json=JSON.stringify(backup,null,2);
+  var b=new Blob([json],{type:"application/json"});var u=URL.createObjectURL(b);
+  var a=document.createElement("a");a.href=u;
+  a.download="riedel-backup-"+MANDANT+"-"+TODAY()+".json";
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
+  toast("Vollbackup "+Math.round(json.length/1024)+"KB gespeichert ✓","ok");
+}
+
+function doImport(evt){
+  var file=evt.target?evt.target.files[0]:evt;if(!file)return;
+  var r=new FileReader();r.onload=function(e){
+    try{
+      var obj=JSON.parse(e.target.result);
+      // Combined v3.1
+      if(obj.version&&obj.cr&&obj.smp){
+        var info="Backup: "+(obj.exported||"").slice(0,10)+
+          "\nProjekte: "+(obj.cr.projects?obj.cr.projects.length:0)+
+          " | Zeit: "+(obj.smp.zeit?obj.smp.zeit.length:0)+
+          "\n\nAlle Daten überschreiben?";
+        if(!confirm(info))return;
+        var d=obj.cr;
+        APP.data.vehicles=d.vehicles||[];APP.data.projects=d.projects||[];
+        APP.data.gruppenVorlagen=d.gruppenVorlagen||APP.data.gruppenVorlagen;
+        APP.data.settings=d.settings||APP.data.settings;
+        if(d.arbeitsgaenge)APP.data.arbeitsgaenge=d.arbeitsgaenge;
+        if(d.mitarbeiter)APP.data.mitarbeiter=d.mitarbeiter;
+        APP.smp.zeit=obj.smp.zeit||[];
+        APP.smp.kundenprojekte=obj.smp.kundenprojekte||[];
+        APP.smp.arbeitsgaenge=obj.smp.arbeitsgaenge||[];
+        APP.smp.mitarbeiter=obj.smp.mitarbeiter||[];
+        for(var i=0;i<APP.data.vehicles.length;i++){var v=APP.data.vehicles[i];if(!v.bild)v.bild=[];if(!v.untB)v.untB=[];if(!v.untA)v.untA=[];if(!v.dok)v.dok=[];if(!v.smpProj)v.smpProj="";}
+        for(var i=0;i<APP.data.projects.length;i++){var p2=APP.data.projects[i];if(!p2.smpProj)p2.smpProj="";if(!p2.teile)p2.teile=[];if(!p2.tagebuch)p2.tagebuch=[];if(!p2.demontage)p2.demontage=[];if(!p2.gruppen)p2.gruppen=[];}
+        APP.pid=null;saveData();render();
+        toast("Vollbackup wiederhergestellt: "+APP.data.projects.length+" Projekte \u2713","ok");
+        return;
+      }
+      // Legacy CR
+      var data=obj.data||obj;
+      if(data&&data.vehicles){
+        if(!confirm("CR Daten überschreiben?"))return;
+        APP.data.vehicles=data.vehicles||[];APP.data.projects=data.projects||[];
+        APP.data.gruppenVorlagen=data.gruppenVorlagen||APP.data.gruppenVorlagen;
+        APP.data.settings=data.settings||APP.data.settings;
+        APP.pid=null;saveData();render();toast("Importiert \u2713","ok");return;
+      }
+      // Legacy SMP
+      if(data&&data.zeit){
+        var added=0,ex={};
+        for(var i=0;i<APP.smp.zeit.length;i++)ex[APP.smp.zeit[i].start]=true;
+        for(var i=0;i<data.zeit.length;i++){if(!ex[data.zeit[i].start]){APP.smp.zeit.push(data.zeit[i]);added++;}}
+        saveData();render();toast(added+" Einträge \u2713","ok");return;
+      }
+      toast("Unbekanntes Format","err");
+    }catch(err){toast("Fehler: "+err.message,"err");}
+  };r.readAsText(file);if(evt.target)evt.target.value="";
+}
+
+// Suppress all unhandled promise rejections (from GitHub Pages / iOS WebKit)
+window.addEventListener("unhandledrejection",function(e){e.preventDefault();return false;});
+
+window.onerror=function(msg,src,line,col,err){
+  // Ignore cross-origin and GitHub Pages errors
+  if(!line||line===0||!src||!msg)return true;
+  if(msg.indexOf("Script error")>=0)return true;
+  if(src&&src.indexOf(window.location.hostname)<0)return true; // only our own errors
+
+  var mc=document.getElementById("MC");
+  if(mc&&mc.innerHTML.indexOf("geladen")>=0)mc.innerHTML="<div style=\"padding:20px;background:#fde8ec;border-radius:8px;margin:20px;font-family:monospace;font-size:11px;color:#c41230\"><strong>JS Fehler (Zeile "+line+"):</strong><br>"+msg+"</div>";
+  return false;
+};
+try{
+  if(E("BTN-EXP"))E("BTN-EXP").addEventListener("click",exportData);
+  if(E("BTN-IMP"))E("BTN-IMP").addEventListener("click",function(){if(E("IMP-FILE"))E("IMP-FILE").click();});
+  if(E("IMP-FILE"))E("IMP-FILE").addEventListener("change",function(ev){doImport(ev);});
+  if(E("SMP-FILE"))E("SMP-FILE").addEventListener("change",doImport);
+  loadData();
+  initLogin();
+  var smn=E("sm-mn");if(smn&&MANDANT!=="default")smn.textContent="Mandant: "+MANDANT;
+  nav("dashboard");
+}catch(ex){
+  var mc=E("MC");
+  if(mc)mc.innerHTML="<div style=\"padding:20px;background:#fde8ec;border-radius:8px;margin:20px;font-family:monospace;font-size:11px;color:#c41230\"><strong>Start-Fehler:</strong> "+ex.message+"</div>";
+}
+
+</script>
+</body>
+</html>
