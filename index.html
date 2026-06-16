@@ -2377,13 +2377,13 @@ return '<div class="card" style="padding:0;overflow:hidden">'
 +'<textarea class="inp" id="wn" placeholder="Notizen…" oninput="wNotiz(this)">'+esc(dn2)+'</textarea>'
 +'</div></div></div></div>';
 }
-function setPD(i){ PD=i; render(); }
+function setPD(i){ PD=i; renderSMPPage('woche'); }
 function kwNav(d){
 var opts=wo(),idx=wIdx(opts,PW2,PY);
-var nx=opts[idx+d]; if(nx){PW2=nx.week;PY=nx.year;render();}
+var nx=opts[idx+d]; if(nx){PW2=nx.week;PY=nx.year;renderSMPPage("woche");}
 }
 function kwSel(sel){
-var v=sel.value.split('_');PW2=parseInt(v[0]);PY=parseInt(v[1]);render();
+var v=sel.value.split('_');PW2=parseInt(v[0]);PY=parseInt(v[1]);renderSMPPage('woche');
 }
 function wAdd(){
 var inp=document.getElementById('wi'),p=document.getElementById('wp');
