@@ -3944,6 +3944,32 @@ function docNextNr(typ){var db=docsDB();if(!db.nextNr)db.nextNr={angebot:1,rechn
 function docCalcSum(pos,mwstSatz,mitMwst){var net=0;for(var i=0;i<(pos||[]).length;i++){var p=pos[i];if(p.typ==="arbeit")net+=agNum(p.std)*agNum(p.satz||109);else if(p.typ==="material")net+=agNum(p.ek)*(1+agNum(p.auf||0)/100)*agNum(p.menge||1);else if(p.typ==="pauschal")net+=agNum(p.preis);}var mwst=mitMwst?net*(agNum(mwstSatz)||19)/100:0;return {net:net,mwst:mwst,gross:net+mwst};}
 function dokStatusChange(id,s){var db=docsDB();for(var i=0;i<db.dokumente.length;i++){if(db.dokumente[i].id===id){db.dokumente[i].status=s;if(s==="rechnung"&&!db.dokumente[i].rechnungNr){db.dokumente[i].rechnungNr=docNextNr("rechnung");db.dokumente[i].rechnungDatum=new Date().toISOString().slice(0,10);}break;}}docsSave();renderSMPPage("dokumente");}
 function dokDelete(id){if(!confirm("Dokument l\u00f6schen?"))return;var db=docsDB();db.dokumente=db.dokumente.filter(function(d){return d.id!==id;});docsSave();renderSMPPage("dokumente");}
+
+function dokNeuVorlage(){
+  var name=prompt("Name der neuen Vorlage:");
+  if(!name||!name.trim())return;
+  var db=docsDB();
+  var vorl={id:"v"+Date.now(),name:name.trim(),positionen:[]};
+  // Copy current positionen as template if any exist
+  if(DOK_NEW&&DOK_NEW.positionen&&DOK_NEW.positionen.length>0){
+    if(confirm("Aktuelle Positionen ("+DOK_NEW.positionen.length+") als Vorlage übernehmen?")){
+      vorl.positionen=JSON.parse(JSON.stringify(DOK_NEW.positionen));
+    }
+  }
+  db.vorlagen.push(vorl);
+  docsSave();
+  toast("Vorlage \""+vorl.name+"\" gespeichert","ok");
+  _refreshDok();
+}
+
+function dokDelVorlage(vid){
+  if(!confirm("Vorlage löschen?"))return;
+  var db=docsDB();
+  db.vorlagen=db.vorlagen.filter(function(v){return v.id!==vid;});
+  docsSave();
+  _refreshDok();
+}
+
 function _refreshDok(){var mc=document.getElementById("MC");if(mc&&DOK_NEW)mc.innerHTML="<div class=\"page\">"+_rDokForm(DOK_NEW,!!DOK_EDIT_ID)+"</div>";}
 function dokAddPos(typ){if(!DOK_NEW)return;if(!DOK_NEW.positionen)DOK_NEW.positionen=[];var satz=109;if(APP.smp.ag&&APP.smp.ag.ss&&APP.smp.ag.ss[0])satz=APP.smp.ag.ss[0].preis;if(typ==="arbeit")DOK_NEW.positionen.push({typ:"arbeit",bez:"",std:1,satz:satz});else if(typ==="material")DOK_NEW.positionen.push({typ:"material",bez:"",nr:"",ek:0,auf:30,menge:1});else DOK_NEW.positionen.push({typ:"pauschal",bez:"",preis:0});_refreshDok();}
 function dokDelPos(i){if(!DOK_NEW)return;DOK_NEW.positionen.splice(i,1);_refreshDok();}
@@ -4021,20 +4047,55 @@ function _rDokForm(dok,isEdit){
   var projOpts="<option value=\"\">-- Kein Projekt --</option>";
   for(var i=0;i<APP.data.projects.length;i++){var sel=dok.projekt===APP.data.projects[i].name?" selected":"";projOpts+="<option value=\""+esc(APP.data.projects[i].name)+"\""+sel+">"+esc(APP.data.projects[i].name)+"</option>";}
   var vorlH="<div style=\"display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px\">";
-  for(var i=0;i<(db.vorlagen||[]).length;i++){var v=db.vorlagen[i];vorlH+="<button onclick=\"dokApplyVorlage(&apos;"+v.id+"&apos;)\" style=\"padding:4px 10px;background:var(--bg);border:1px solid var(--border);font-size:11px;cursor:pointer\">&#10010; "+esc(v.name)+"</button>";}
+  for(var i=0;i<(db.vorlagen||[]).length;i++){var v=db.vorlagen[i];vorlH+="<span style=\"display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);background:var(--bg)\">";
+    vorlH+="<button onclick=\"dokApplyVorlage(&apos;"+v.id+"&apos;)\" style=\"padding:4px 10px;border:none;background:transparent;font-size:11px;cursor:pointer\">&#10010; "+esc(v.name)+"</button>";
+    vorlH+="<button onclick=\"dokDelVorlage(&apos;"+v.id+"&apos;)\" style=\"padding:4px 6px;border:none;border-left:1px solid var(--border);background:transparent;font-size:10px;cursor:pointer;color:var(--text3);opacity:.5\">&#10005;</button>";
+    vorlH+="</span>";}
+  vorlH+="<button onclick=\"dokNeuVorlage()\" style=\"padding:4px 10px;background:transparent;border:1px dashed var(--border);font-size:11px;cursor:pointer;color:var(--text3)\">+ Neue Vorlage</button>";
   vorlH+="</div>";
   var posR="";
   for(var i=0;i<(dok.positionen||[]).length;i++){
     var p=dok.positionen[i],bet=0;
     if(p.typ==="arbeit")bet=agNum(p.std)*agNum(p.satz||109);else if(p.typ==="material")bet=agNum(p.ek)*(1+agNum(p.auf||0)/100)*agNum(p.menge||1);else bet=agNum(p.preis);
-    posR+="<tr>";
-    posR+="<td><select onchange=\"dokUpdPos("+i+",&quot;typ&quot;,this.value)\" style=\"border:none;background:transparent;font-size:11px;width:72px\"><option value=\"arbeit\""+(p.typ==="arbeit"?" selected":"")+">Arbeit</option><option value=\"material\""+(p.typ==="material"?" selected":"")+">Material</option><option value=\"pauschal\""+(p.typ==="pauschal"?" selected":"")+">Pauschal</option></select></td>";
-    posR+="<td><input value=\""+esc(p.bez||"")+"\" onchange=\"dokUpdPos("+i+",&quot;bez&quot;,this.value)\" placeholder=\"Bezeichnung\" style=\"width:100%;border:none;background:transparent;font-size:12px\"></td>";
-    if(p.typ==="arbeit")posR+="<td style=\"white-space:nowrap\"><input type=\"number\" value=\""+agNum(p.std)+"\" onchange=\"dokUpdPos("+i+",&quot;std&quot;,this.value)\" style=\"width:48px;border:none;background:transparent;text-align:right;font-size:11px\"> h @ <input type=\"number\" value=\""+(p.satz||109)+"\" onchange=\"dokUpdPos("+i+",&quot;satz&quot;,this.value)\" style=\"width:48px;border:none;background:transparent;text-align:right;font-size:11px\"> \u20ac</td>";
-    else if(p.typ==="material")posR+="<td style=\"white-space:nowrap\"><input type=\"number\" value=\""+(p.menge||1)+"\" onchange=\"dokUpdPos("+i+",&quot;menge&quot;,this.value)\" style=\"width:35px;border:none;background:transparent;text-align:right;font-size:11px\">x EK<input type=\"number\" value=\""+agNum(p.ek)+"\" onchange=\"dokUpdPos("+i+",&quot;ek&quot;,this.value)\" style=\"width:52px;border:none;background:transparent;text-align:right;font-size:11px\"> +<input type=\"number\" value=\""+(p.auf||30)+"\" onchange=\"dokUpdPos("+i+",&quot;auf&quot;,this.value)\" style=\"width:38px;border:none;background:transparent;text-align:right;font-size:11px\">%</td>";
-    else posR+="<td><input type=\"number\" value=\""+agNum(p.preis)+"\" onchange=\"dokUpdPos("+i+",&quot;preis&quot;,this.value)\" style=\"width:72px;border:none;background:transparent;text-align:right;font-size:12px\"> \u20ac</td>";
-    posR+="<td style=\"text-align:right;font-weight:700;color:var(--green2);font-size:12px;white-space:nowrap\">"+agFmt(bet)+" \u20ac</td>";
-    posR+="<td><button onclick=\"dokDelPos("+i+")\" style=\"background:none;border:none;color:var(--text3);cursor:pointer;opacity:.4\">&#10005;</button></td></tr>";
+    // Card-style position row
+    var typColor=p.typ==="arbeit"?"var(--teal)":p.typ==="material"?"var(--amber)":"var(--text3)";
+    var typLabel=p.typ==="arbeit"?"Arbeit":p.typ==="material"?"Material":"Pauschal";
+    posR+="<div style=\"background:var(--card);border:1px solid var(--border);border-left:3px solid "+typColor+";padding:10px 12px;margin-bottom:6px\">";
+    // Header row: typ select + betrag + delete
+    posR+="<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:8px\">";
+    posR+="<select onchange=\"dokUpdPos("+i+",&quot;typ&quot;,this.value)\" style=\"border:none;background:"+typColor+"22;color:"+typColor+";font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase\">";
+    posR+="<option value=\"arbeit\""+(p.typ==="arbeit"?" selected":"")+">Arbeit</option>";
+    posR+="<option value=\"material\""+(p.typ==="material"?" selected":"")+">Material</option>";
+    posR+="<option value=\"pauschal\""+(p.typ==="pauschal"?" selected":"")+">Pauschal</option>";
+    posR+="</select>";
+    posR+="<div style=\"margin-left:auto;font-weight:700;font-size:13px;color:var(--green2)\">"+agFmt(bet)+" \u20ac</div>";
+    posR+="<button onclick=\"dokDelPos("+i+")\" style=\"background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;line-height:1;padding:0 2px\">&#10005;</button>";
+    posR+="</div>";
+    // Bezeichnung - full width
+    posR+="<input value=\""+esc(p.bez||"")+"\" onchange=\"dokUpdPos("+i+",&quot;bez&quot;,this.value)\" placeholder=\"Bezeichnung\" style=\"width:100%;padding:6px 8px;border:1px solid var(--border);background:var(--bg);font-size:13px;font-weight:600;margin-bottom:8px\">";
+    // Detail inputs depending on type
+    if(p.typ==="arbeit"){
+      posR+="<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px\">";
+      posR+="<div><label style=\"font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px\">Stunden</label>";
+      posR+="<input type=\"number\" value=\""+agNum(p.std)+"\" onchange=\"dokUpdPos("+i+",&quot;std&quot;,this.value)\" style=\"width:100%;padding:5px 8px;border:1px solid var(--border);background:var(--bg);font-size:13px;text-align:right\" step=\"0.5\"></div>";
+      posR+="<div><label style=\"font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px\">Stundensatz (\u20ac/h)</label>";
+      posR+="<input type=\"number\" value=\""+(p.satz||109)+"\" onchange=\"dokUpdPos("+i+",&quot;satz&quot;,this.value)\" style=\"width:100%;padding:5px 8px;border:1px solid var(--border);background:var(--bg);font-size:13px;text-align:right\"></div>";
+      posR+="</div>";
+    } else if(p.typ==="material"){
+      posR+="<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px\">";
+      posR+="<div><label style=\"font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px\">Menge</label>";
+      posR+="<input type=\"number\" value=\""+(agNum(p.menge)||1)+"\" onchange=\"dokUpdPos("+i+",&quot;menge&quot;,this.value)\" style=\"width:100%;padding:5px 8px;border:1px solid var(--border);background:var(--bg);font-size:13px;text-align:right\" step=\"1\"></div>";
+      posR+="<div><label style=\"font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px\">EK-Preis (\u20ac)</label>";
+      posR+="<input type=\"number\" value=\""+agNum(p.ek)+"\" onchange=\"dokUpdPos("+i+",&quot;ek&quot;,this.value)\" style=\"width:100%;padding:5px 8px;border:1px solid var(--border);background:var(--bg);font-size:13px;text-align:right\"></div>";
+      posR+="<div><label style=\"font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px\">Aufschlag (%)</label>";
+      posR+="<input type=\"number\" value=\""+(agNum(p.auf)||30)+"\" onchange=\"dokUpdPos("+i+",&quot;auf&quot;,this.value)\" style=\"width:100%;padding:5px 8px;border:1px solid var(--border);background:var(--bg);font-size:13px;text-align:right\"></div>";
+      posR+="</div>";
+      if(p.nr)posR+="<div style=\"margin-top:6px;font-size:10px;color:var(--text3);font-family:monospace\">Teilenr: "+esc(p.nr)+"</div>";
+    } else {
+      posR+="<div><label style=\"font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px\">Betrag (\u20ac)</label>";
+      posR+="<input type=\"number\" value=\""+agNum(p.preis)+"\" onchange=\"dokUpdPos("+i+",&quot;preis&quot;,this.value)\" style=\"width:100%;padding:5px 8px;border:1px solid var(--border);background:var(--bg);font-size:13px;text-align:right\"></div>";
+    }
+    posR+="</div>";
   }
   var tbH=(db.textbausteine||[]).map(function(t){return "<button onclick=\"dokAppendNotiz(&apos;"+esc(t.text.replace(/\n/g,"\\n")).replace(/'/g,"&apos;")+"&apos;)\" style=\"padding:3px 8px;background:var(--bg);border:1px solid var(--border);font-size:10px;cursor:pointer\">"+esc(t.name)+"</button>";}).join(" ");
   var r="<div style=\"display:flex;align-items:center;gap:10px;margin-bottom:18px\">";
@@ -4068,7 +4129,7 @@ function _rDokForm(dok,isEdit){
   r+="<div style=\"display:flex;gap:4px\"><button onclick=\"dokAddPos(&apos;arbeit&apos;)\" style=\"background:var(--bg);border:1px solid var(--border);padding:4px 8px;font-size:10px;cursor:pointer\">+ Arbeit</button><button onclick=\"dokAddPos(&apos;material&apos;)\" style=\"background:var(--bg);border:1px solid var(--border);padding:4px 8px;font-size:10px;cursor:pointer\">+ Material</button><button onclick=\"dokAddPos(&apos;pauschal&apos;)\" style=\"background:var(--bg);border:1px solid var(--border);padding:4px 8px;font-size:10px;cursor:pointer\">+ Pauschal</button></div></div>";
   r+="<div style=\"margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)\">";
   r+="<div style=\"font-size:10px;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px\">Vorlagen</div>"+vorlH+"</div>";
-  r+=((dok.positionen||[]).length>0?"<div class=\"twrap\" style=\"margin-bottom:10px\"><table><thead><tr><th style=\"width:72px\">Typ</th><th>Bezeichnung</th><th>Details</th><th style=\"text-align:right\">Betrag</th><th style=\"width:28px\"></th></tr></thead><tbody>"+posR+"</tbody></table></div>":"<div style=\"text-align:center;padding:20px;color:var(--text3);background:var(--bg);margin-bottom:10px;font-size:12px\">Noch keine Positionen</div>");
+  r+=((dok.positionen||[]).length>0?"<div style=\"margin-bottom:10px\">"+posR+"</div>":"<div style=\"text-align:center;padding:20px;color:var(--text3);background:var(--bg);margin-bottom:10px;font-size:12px\">Noch keine Positionen</div>");
   r+="<div style=\"background:#e0f7fa;border:1px solid rgba(8,145,178,.2);padding:8px 12px;margin-bottom:10px;font-size:11px;display:flex;align-items:center;gap:8px\"><b style=\"color:var(--teal)\">&#128229; Aus Projekt:</b><button onclick=\"dokFromProjekt()\" style=\"background:var(--teal);color:#fff;border:none;padding:4px 10px;font-size:10px;font-weight:600;cursor:pointer\">Zeiten + Teile laden</button></div>";
   r+="<div style=\"background:var(--bg);padding:10px;border:1px solid var(--border)\">";
   r+="<div style=\"display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px\"><span>Summe netto</span><span style=\"font-weight:700\">"+agFmt(sum.net)+" \u20ac</span></div>";
