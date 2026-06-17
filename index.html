@@ -35,6 +35,7 @@
     <div class="ni" data-v="pbf">&#128203; Fahrzeugbefund</div>
   </div>
   <div class="nlbl">Werkzeuge</div>
+  <div class="ni" data-v="dokumente">&#128196; Angebote &amp; Rechnungen</div>
   <div class="ni" data-v="teilesuche">&#128269; Teilesuche</div>
   <div class="ni" data-v="kalkulation">&#128203; Kalkulation</div>
   <div class="nlbl">RC Dev</div>
@@ -2029,6 +2030,36 @@ if(!APP.smp.kw) APP.smp.kw=[];
 if(!APP.smp.auf) APP.smp.auf=[];
 if(!APP.smp.id) APP.smp.id=[];
   if(!APP.smp.rcdev) APP.smp.rcdev={projects:[],stamm:{fuer:[],ziel:[],vtb:[]}};
+  if(!APP.smp.docs) APP.smp.docs={
+    dokumente:[],
+    vorlagen:[
+      {id:'v1',name:'Trockeneinstrahlen + Versiegelung',positionen:[
+        {bez:'Fahrzeug reinigen und entfetten',std:2,typ:'arbeit'},
+        {bez:'Trockeneinstrahlen (Hohlräume)',std:3,typ:'arbeit'},
+        {bez:'Versiegelung auftragen und aushärten',std:2,typ:'arbeit'},
+        {bez:'Qualitätskontrolle und Finish',std:1,typ:'arbeit'}
+      ]},
+      {id:'v2',name:'Hauptuntersuchung Vorbereitung',positionen:[
+        {bez:'Fahrzeugcheck und Mängelliste',std:1,typ:'arbeit'},
+        {bez:'Beleuchtung prüfen und einstellen',std:0.5,typ:'arbeit'},
+        {bez:'Bremsen prüfen',std:1,typ:'arbeit'},
+        {bez:'Abgasuntersuchung',std:0.5,typ:'arbeit'}
+      ]},
+      {id:'v3',name:'Einlagerung Winterpause',positionen:[
+        {bez:'Fahrzeug reinigen innen/außen',std:2,typ:'arbeit'},
+        {bez:'Konservierung Karosserie',std:1,typ:'arbeit'},
+        {bez:'Reifenwechsel und Einlagerung',std:1,typ:'arbeit'},
+        {bez:'Kraftstofftank behandeln',std:0.5,typ:'arbeit'},
+        {bez:'Einlagerungsdokumentation',std:0.5,typ:'arbeit'}
+      ]}
+    ],
+    nextNr:{angebot:1,rechnung:1},
+    textbausteine:[
+      {id:'t1',name:'Gewährleistung',text:'Wir gewähren auf unsere Arbeiten eine Gewährleistung von 12 Monaten gemäß gesetzlicher Vorschriften.'},
+      {id:'t2',name:'Zahlungsbedingungen',text:'Zahlbar innerhalb von 14 Tagen nach Rechnungsdatum ohne Abzug.'},
+      {id:'t3',name:'Danksagung',text:'Wir bedanken uns für Ihr Vertrauen und freuen uns auf eine weitere Zusammenarbeit.'}
+    ]
+  };
 if(!APP.smp.kundenprojekte) APP.smp.kundenprojekte=[];
 if(!APP.smp.arbeitsgaenge) APP.smp.arbeitsgaenge=[];
 if(!APP.smp.mitarbeiter) APP.smp.mitarbeiter=[];
