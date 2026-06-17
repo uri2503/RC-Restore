@@ -34,6 +34,8 @@
     <div class="ni" data-v="pz">&#9203; Zeiterfassung</div>
     <div class="ni" data-v="pbf">&#128203; Fahrzeugbefund</div>
   </div>
+  <div class="nlbl">RC Dev</div>
+  <div class="ni" data-v="rcdev">&#128187; RC Dev</div>
   <div class="nlbl">Wochenplanung</div>
   <div class="ni" data-v="woche">&#128197; Wochenplanung</div>
   <div class="ni" data-v="auf">&#9989; Aufgaben</div>
@@ -2023,6 +2025,7 @@ function smpDB(){
 if(!APP.smp.kw) APP.smp.kw=[];
 if(!APP.smp.auf) APP.smp.auf=[];
 if(!APP.smp.id) APP.smp.id=[];
+  if(!APP.smp.rcdev) APP.smp.rcdev={projects:[],stamm:{fuer:[],ziel:[],vtb:[]}};
 if(!APP.smp.kundenprojekte) APP.smp.kundenprojekte=[];
 if(!APP.smp.arbeitsgaenge) APP.smp.arbeitsgaenge=[];
 if(!APP.smp.mitarbeiter) APP.smp.mitarbeiter=[];
