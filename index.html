@@ -681,7 +681,8 @@ var p=curP(),v=getV(p.vid);
 return "<div class=\"page\"><div style=\"margin-bottom:12px\"><div class=\"flex fac g3p mb2\">"
 +"<button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"projects\">&larr; Projekte</button>"+pjb(p.status)
 +(p.smpProj?"<span class=\"smp-link-badge\">&#9203; "+p.smpProj+"</span>":"")+"</div>"
-+"<div class=\"pt\">"+p.name+"</div>"
++"<div style=\"display:flex;align-items:center;justify-content:space-between\"><div class=\"pt\" style=\"margin:0\">"+p.name+"</div>"
++"<button onclick=\"window.open('https://uri2503.github.io/RC-KnowHow/?q='+encodeURIComponent(curP().name),'_blank')\" style=\"background:#0891b2;color:#fff;border:none;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer\">&#128218; Know-How &#8599;</button></div>"
 +"<div class=\"ps\">"+(v?v.marke+" "+v.modell+" &bull; "+v.baujahr:"")+" &bull; "+FMTD(p.start)+" &ndash; "+FMTD(p.ende)+"</div></div>"
 +"<div class=\"tabs\">"
 +"<div class=\"tab"+(a==="o"?" active":"")+"\" data-action=\"nav\" data-id=\"po\">&Uuml;bersicht</div>"
@@ -711,6 +712,14 @@ smpRe+="<div style=\"border-left:3px solid var(--teal);padding:6px 10px;margin-b
 +"<div class=\"tsm mt2 cm\">"+(se.note||"").replace(/\[[^\]]+\]$/,"").trim()+"</div></div>";
 }
 return pH("o")
++"<div style=\"background:#e0f7fa;border:1px solid rgba(8,145,178,.2);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px\">"
++"<span style=\"font-size:20px\">&#128218;</span>"
++"<div style=\"flex:1\"><div style=\"font-size:12px;font-weight:600;color:#0891b2\">RC Know-How</div><div style=\"font-size:11px;color:var(--text3)\">Reparaturanleitungen, Videos &amp; Fehlerdiagnose</div></div>"
++"<div style=\"display:flex;gap:6px\">"
++"<button onclick=\"openKnowHow(curP().name)\" style=\"background:#0891b2;color:#fff;border:none;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer\">&#128269; Suchen &#8599;</button>"
++"<button onclick=\"exportForKnowHow()\" style=\"background:var(--bg);border:1px solid var(--border);padding:6px 12px;font-size:11px;cursor:pointer\">&#128229; Exportieren</button>"
++"<label style=\"background:var(--bg);border:1px solid var(--border);padding:6px 12px;font-size:11px;cursor:pointer\">&#128228; Import<input type=\"file\" accept=\".json\" style=\"display:none\" onchange=\"importFromKnowHow(this.files[0])\"></label>"
++"</div></div>"
 +"<div class=\"g2\"><div>"
 +"<div class=\"card mb3\">"
 +"<div class=\"flex fac fjb mb3\"><strong>&#128176; Kostencontrolling</strong>"
@@ -4903,6 +4912,68 @@ function dokPrint(id){
   w.document.write(html);
   w.document.close();
   setTimeout(function(){w.focus();w.print();},400);
+}
+
+// ── RC KNOW-HOW BRÜCKE ───────────────────────────────────────────
+function openKnowHow(query){
+  var url="https://uri2503.github.io/RC-KnowHow/";
+  if(query) url+="?q="+encodeURIComponent(query);
+  window.open(url,"_blank");
+}
+
+function exportForKnowHow(){
+  // Export current project as JSON for AutoguideAI import
+  var p=curP();
+  if(!p)return;
+  var v=getV(p.vid)||{};
+  var data={
+    source:"RC_Restore",
+    projekt:{
+      name:p.name,
+      fahrzeug:(v.marke||"")+" "+(v.modell||"")+" "+(v.baujahr||""),
+      marke:v.marke||"",
+      modell:v.modell||"",
+      baujahr:v.baujahr||"",
+      beschreibung:p.notiz||p.beschreibung||""
+    },
+    arbeitsgaenge:(p.planung||[]).map(function(s){return {bez:s.bez||s.name||"",status:s.status||""};}),
+    teile:(p.teile||[]).map(function(t){return {name:t.name||t.bezeichnung||"",nr:t.nr||"",status:t.status||""};})
+  };
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="RC_Projekt_"+p.name.replace(/[^a-zA-Z0-9]/g,"_")+".json";
+  a.click();
+  toast("Projekt exportiert für RC Know-How","ok");
+}
+
+// Import from AutoguideAI (saved Anleitungen as Projekt-Notizen)
+function importFromKnowHow(file){
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      if(!data.quelle||data.quelle!=="RC_KnowHow"){
+        // Try generic format
+        if(!data.titel&&!data.anleitungen){toast("Unbekanntes Format","err");return;}
+      }
+      var p=curP();if(!p)return;
+      // Add anleitung as Tagebuch entry
+      if(!p.tagebuch)p.tagebuch=[];
+      var eintrag={
+        id:"tb"+Date.now(),
+        datum:new Date().toISOString().slice(0,10),
+        text:"[Know-How Import] "+(data.titel||data.anfrage||"Anleitung"),
+        notiz:data.schritte?(data.schritte.map(function(s,i){return (i+1)+". "+(s.text||s);}).join(" | ")):JSON.stringify(data,null,2)
+      };
+      p.tagebuch.unshift(eintrag);
+      saveDB();
+      toast("Anleitung ins Tagebuch importiert","ok");
+      nav("pb");
+    }catch(ex){toast("Fehler: "+ex.message,"err");}
+  };
+  reader.readAsText(file,"UTF-8");
 }
 </script>
 </body>
