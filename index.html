@@ -36,6 +36,7 @@
   </div>
   <div class="nlbl">Werkzeuge</div>
   <div class="ni" data-v="dokumente">&#128196; Angebote &amp; Rechnungen</div>
+  <div class="ni" data-v="kunden">&#128100; Kundenstamm</div>
   <div class="ni" data-v="teilesuche">&#128269; Teilesuche</div>
   <div class="ni" data-v="kalkulation">&#128203; Kalkulation</div>
   <div class="nlbl">RC Dev</div>
@@ -448,7 +449,7 @@ function plb(s){var m={Geplant:"b-gray","In Arbeit":"b-blue",Fertig:"b-green",Pr
 function psb(s){var x={l:s,c:"ps0"};for(var i=0;i<PST.length;i++)if(PST[i].v===s){x=PST[i];break;}return badge(x.c,x.i+" "+x.l);}
 function dot(s){var c={Fertig:"var(--green2)","In Arbeit":"#cc9200",Geplant:"var(--text3)",Problem:"var(--red)"}[s]||"var(--text3)";return "<span style=\"width:7px;height:7px;border-radius:50%;background:"+c+";display:inline-block;flex-shrink:0\"></span>";}
 function nav(view,pid){
-var _smpP={'woche':1,'auf':1,'id':1,'rcdev':1,'zeit':1,'zeitliste':1,'zeitrep':1,'teilesuche':1,'kalkulation':1,'dokumente':1,'stamm':1,'backup':1};
+var _smpP={'woche':1,'auf':1,'id':1,'rcdev':1,'zeit':1,'zeitliste':1,'zeitrep':1,'teilesuche':1,'kalkulation':1,'dokumente':1,'kunden':1,'stamm':1,'backup':1};
 if(_smpP[view]){
 APP.view=view;
 var _ni=document.querySelectorAll('.ni');
@@ -3572,6 +3573,7 @@ else if(v==='rcdev') mc.innerHTML='<div class="page">'+rRCDev()+'</div>';
 else if(v==='teilesuche') mc.innerHTML='<div class="page">'+rTeilesuche()+'</div>';
 else if(v==='kalkulation') mc.innerHTML='<div class="page">'+rKalkulation()+'</div>';
 else if(v==='dokumente') mc.innerHTML='<div class="page">'+rDokumente()+'</div>';
+    else if(v==='kunden') mc.innerHTML='<div class="page">'+rKunden()+'</div>';
 if(v==='zeitliste'||v==='zeit') setTimeout(checkStampTimer,100);
 setTimeout(bindSMPEvents,50);
 }catch(ex){mc.innerHTML='<div class="page"><div style="background:#fde8ec;padding:16px;border-radius:6px;color:#c41230"><b>Fehler:</b> '+ex.message+'</div></div>';}
@@ -3930,10 +3932,12 @@ function docsDB(){
     ],
     nextNr:{angebot:1,rechnung:1},
     textbausteine:[
-      {id:"t1",name:"Gew\u00e4hrleistung",text:"Wir gew\u00e4hren auf unsere Arbeiten eine Gew\u00e4hrleistung von 12 Monaten."},
-      {id:"t2",name:"Zahlungsbedingungen",text:"Zahlbar innerhalb von 14 Tagen nach Rechnungsdatum ohne Abzug."},
-      {id:"t3",name:"Danksagung",text:"Wir bedanken uns f\u00fcr Ihr Vertrauen und freuen uns auf weitere Zusammenarbeit."}
-    ]
+      {id:"t1",name:"Gew\u00e4hrleistung",text:"Wir gew\u00e4hren auf unsere Arbeiten eine Gew\u00e4hrleistung von 12 Monaten gem\u00e4\u00df gesetzlicher Vorschriften."},
+      {id:"t2",name:"Zahlungsbedingungen",text:"Zahlbar innerhalb von 14 Tagen nach Rechnungsdatum ohne Abzug. Bei Zahlung innerhalb von 7 Tagen gew\u00e4hren wir 2% Skonto."},
+      {id:"t3",name:"Danksagung",text:"Wir bedanken uns f\u00fcr Ihr Vertrauen und freuen uns auf eine weitere Zusammenarbeit."},
+      {id:"t4",name:"Auftragsannahme",text:"Vielen Dank f\u00fcr Ihren Auftrag. Wir werden die Arbeiten termingerecht ausf\u00fchren und Sie \u00fcber den Fortschritt informieren."}
+    ],
+    kunden:[]
   };
   return APP.smp.docs;
 }
@@ -3968,6 +3972,168 @@ function dokDelVorlage(vid){
   db.vorlagen=db.vorlagen.filter(function(v){return v.id!==vid;});
   docsSave();
   _refreshDok();
+}
+
+
+// ── KUNDEN STAMMDATEN ────────────────────────────────────────────
+function kundenDB(){return docsDB().kunden||(docsDB().kunden=[]);}
+
+function kundenSave(){docsSave();}
+
+function kundenFind(name){
+  var kunden=kundenDB();
+  if(!name)return null;
+  var nl=name.toLowerCase();
+  for(var i=0;i<kunden.length;i++){
+    if(kunden[i].name.toLowerCase()===nl) return kunden[i];
+    if(kunden[i].name.toLowerCase().indexOf(nl)>=0) return kunden[i];
+  }
+  return null;
+}
+
+function kundenAutoFill(name){
+  // Fill dok form fields from Kundenstamm
+  var k=kundenFind(name);
+  if(!k)return;
+  var adr=document.getElementById("dok-adresse");
+  var fzg=document.getElementById("dok-fahrzeug");
+  if(adr&&!adr.value&&k.adresse) adr.value=k.adresse;
+  if(fzg&&!fzg.value&&k.fahrzeug) fzg.value=k.fahrzeug;
+  toast("Kunde "+k.name+" geladen","ok");
+}
+
+function kundenSaveFromDok(){
+  // Save current dok form data as Kunde
+  var name=(document.getElementById("dok-kunde")||{}).value||"";
+  if(!name){toast("Bitte zuerst Kundennamen eingeben","err");return;}
+  var adresse=(document.getElementById("dok-adresse")||{}).value||"";
+  var fahrzeug=(document.getElementById("dok-fahrzeug")||{}).value||"";
+  var db=docsDB();
+  if(!db.kunden) db.kunden=[];
+  // Check if exists
+  var existing=null;
+  for(var i=0;i<db.kunden.length;i++){
+    if(db.kunden[i].name.toLowerCase()===name.toLowerCase()){existing=db.kunden[i];break;}
+  }
+  if(existing){
+    existing.adresse=adresse||existing.adresse;
+    existing.fahrzeug=fahrzeug||existing.fahrzeug;
+    existing.updated=new Date().toISOString().slice(0,10);
+    toast("Kunde aktualisiert","ok");
+  } else {
+    db.kunden.push({id:"k"+Date.now(),name:name,adresse:adresse,fahrzeug:fahrzeug,created:new Date().toISOString().slice(0,10)});
+    toast("Kunde gespeichert","ok");
+  }
+  docsSave();
+}
+
+function rKunden(){
+  var db=docsDB();
+  var kunden=db.kunden||[];
+  var rows=kunden.map(function(k){
+    return "<tr>"
+      +"<td style=\"font-weight:600;font-size:12px\">"+esc(k.name)+"</td>"
+      +"<td style=\"font-size:11px;color:var(--text3);white-space:pre-line\">"+esc(k.adresse||"")+"</td>"
+      +"<td style=\"font-size:11px;color:var(--text3)\">"+esc(k.fahrzeug||"")+"</td>"
+      +"<td style=\"font-size:10px;color:var(--text3)\">"+esc(k.created||"")+"</td>"
+      +"<td style=\"white-space:nowrap\">"
+      +"<button onclick=\"kundenEdit(&apos;"+k.id+"&apos;)\" style=\"background:var(--bg);border:1px solid var(--border);padding:3px 8px;font-size:10px;cursor:pointer;margin-right:3px\">&#9998;</button>"
+      +"<button onclick=\"kundenDel(&apos;"+k.id+"&apos;)\" style=\"background:none;border:none;color:var(--text3);cursor:pointer;opacity:.4\">&#10005;</button>"
+      +"</td></tr>";
+  }).join("");
+
+  return "<div class=\"pt\" style=\"margin-bottom:4px\">&#128100; Kundenstamm</div>"
+    +"<div style=\"font-size:11px;color:var(--text3);margin-bottom:16px\">"+kunden.length+" Kunden gespeichert</div>"
+    +"<div class=\"card\" style=\"margin-bottom:14px\">"
+    +"<div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px\">Neuer Kunde</div>"
+    +"<div style=\"display:grid;gap:7px\">"
+    +"<input id=\"k-name\" class=\"fi\" placeholder=\"Name / Firma\"><textarea id=\"k-adr\" class=\"fi\" placeholder=\"Adresse (Stra\u00dfe, PLZ Ort)\" style=\"min-height:55px;resize:vertical\"></textarea>"
+    +"<input id=\"k-fzg\" class=\"fi\" placeholder=\"Fahrzeug (z.B. Mercedes W107 450 SL)\">"
+    +"<input id=\"k-tel\" class=\"fi\" placeholder=\"Telefon\">"
+    +"<input id=\"k-mail\" class=\"fi\" placeholder=\"E-Mail\">"
+    +"<button onclick=\"kundenAdd()\" style=\"background:var(--red);color:#fff;border:none;padding:8px;font-size:12px;font-weight:600;cursor:pointer\">Kunde speichern</button>"
+    +"</div></div>"
+    +(kunden.length>0
+      ?"<div class=\"twrap\"><table><thead><tr><th>Name</th><th>Adresse</th><th>Fahrzeug</th><th>Angelegt</th><th></th></tr></thead><tbody>"+rows+"</tbody></table></div>"
+      :"<div style=\"text-align:center;padding:32px;color:var(--text3);background:var(--bg)\"><div style=\"font-size:28px;margin-bottom:8px\">&#128100;</div>Noch keine Kunden<br><small>Kunden werden automatisch beim Speichern von Dokumenten angelegt</small></div>");
+}
+
+function kundenAdd(){
+  var name=(document.getElementById("k-name")||{}).value||"";
+  if(!name){toast("Name erforderlich","err");return;}
+  var db=docsDB();if(!db.kunden)db.kunden=[];
+  db.kunden.push({
+    id:"k"+Date.now(),
+    name:name,
+    adresse:(document.getElementById("k-adr")||{}).value||"",
+    fahrzeug:(document.getElementById("k-fzg")||{}).value||"",
+    tel:(document.getElementById("k-tel")||{}).value||"",
+    mail:(document.getElementById("k-mail")||{}).value||"",
+    created:new Date().toISOString().slice(0,10)
+  });
+  docsSave();toast("Kunde gespeichert","ok");renderSMPPage("kunden");
+}
+
+function kundenEdit(id){
+  var db=docsDB(),k=null;
+  for(var i=0;i<(db.kunden||[]).length;i++)if(db.kunden[i].id===id){k=db.kunden[i];break;}
+  if(!k)return;
+  var name=prompt("Name:",k.name||"");if(name===null)return;
+  var adr=prompt("Adresse:",k.adresse||"");if(adr===null)return;
+  var fzg=prompt("Fahrzeug:",k.fahrzeug||"");if(fzg===null)return;
+  var tel=prompt("Telefon:",k.tel||"");if(tel===null)return;
+  k.name=name;k.adresse=adr;k.fahrzeug=fzg;k.tel=tel;
+  docsSave();toast("Aktualisiert","ok");renderSMPPage("kunden");
+}
+
+function kundenDel(id){
+  if(!confirm("Kunde l\u00f6schen?"))return;
+  var db=docsDB();
+  db.kunden=(db.kunden||[]).filter(function(k){return k.id!==id;});
+  docsSave();renderSMPPage("kunden");
+}
+
+// Kundensuggestions im Dok-Formular
+function _kundenSuggest(val){
+  var db=docsDB(),kunden=db.kunden||[];
+  var el=document.getElementById("dok-kunde-suggest");
+  if(!el)return;
+  if(!val||val.length<2){el.style.display="none";return;}
+  var vl=val.toLowerCase();
+  var matches=kunden.filter(function(k){return k.name.toLowerCase().indexOf(vl)>=0;});
+  if(matches.length===0){el.style.display="none";return;}
+  var html="";
+  for(var i=0;i<Math.min(matches.length,5);i++){
+    var k=matches[i];
+    html+="<div onclick=\"_kundenSelect(&apos;"+k.id+"&apos;)\" style=\"padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px\" onmouseover=\"this.style.background=&apos;var(--bg)&apos;\" onmouseout=\"this.style.background=&apos;transparent&apos;\">"
+      +"<b>"+esc(k.name)+"</b>"+(k.fahrzeug?"<span style=\"color:var(--text3);margin-left:8px;font-size:11px\">"+esc(k.fahrzeug)+"</span>":"")
+      +"</div>";
+  }
+  el.innerHTML=html;el.style.display="block";
+}
+
+function _kundenSelect(id){
+  var db=docsDB(),k=null;
+  for(var i=0;i<(db.kunden||[]).length;i++)if(db.kunden[i].id===id){k=db.kunden[i];break;}
+  if(!k)return;
+  var nameEl=document.getElementById("dok-kunde");
+  var adrEl=document.getElementById("dok-adresse");
+  var fzgEl=document.getElementById("dok-fahrzeug");
+  if(nameEl) nameEl.value=k.name;
+  if(adrEl&&k.adresse) adrEl.value=k.adresse;
+  if(fzgEl&&k.fahrzeug) fzgEl.value=k.fahrzeug;
+  if(DOK_NEW){DOK_NEW.kunde=k.name;DOK_NEW.adresse=k.adresse||"";DOK_NEW.fahrzeug=k.fahrzeug||"";}
+  var sug=document.getElementById("dok-kunde-suggest");
+  if(sug) sug.style.display="none";
+  toast("Kunde "+k.name+" geladen","ok");
+}
+
+
+function _appendTb(idx){
+  var db=docsDB(),tb=(db.textbausteine||[])[idx];
+  if(!tb)return;
+  var el=document.getElementById("dok-notiz");
+  if(el) el.value=(el.value?(el.value+"\n\n"):"")+tb.text;
 }
 
 function _refreshDok(){var mc=document.getElementById("MC");if(mc&&DOK_NEW)mc.innerHTML="<div class=\"page\">"+_rDokForm(DOK_NEW,!!DOK_EDIT_ID)+"</div>";}
@@ -4037,6 +4203,15 @@ function dokSave(){
   if(!DOK_NEW.nr)DOK_NEW.nr=docNextNr(DOK_NEW.status==="rechnung"?"rechnung":"angebot");
   if(DOK_EDIT_ID){for(var i=0;i<db.dokumente.length;i++){if(db.dokumente[i].id===DOK_EDIT_ID){db.dokumente[i]=DOK_NEW;break;}}}
   else{db.dokumente.push(DOK_NEW);}
+  // Auto-save Kundenstamm
+  if(DOK_NEW.kunde){
+    var db2=docsDB();if(!db2.kunden)db2.kunden=[];
+    var kExists=false;
+    for(var ki=0;ki<db2.kunden.length;ki++){if(db2.kunden[ki].name.toLowerCase()===DOK_NEW.kunde.toLowerCase()){kExists=true;break;}}
+    if(!kExists&&DOK_NEW.kunde){
+      db2.kunden.push({id:"k"+Date.now(),name:DOK_NEW.kunde,adresse:DOK_NEW.adresse||"",fahrzeug:DOK_NEW.fahrzeug||"",created:new Date().toISOString().slice(0,10)});
+    }
+  }
   docsSave();DOK_NEW=null;DOK_EDIT_ID=null;
   toast("Dokument gespeichert","ok");renderSMPPage("dokumente");
 }
@@ -4114,7 +4289,13 @@ function _rDokForm(dok,isEdit){
   r+="<div class=\"card\" style=\"margin-bottom:12px\">";
   r+="<div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px\">Kunde</div>";
   r+="<div style=\"display:grid;gap:7px\">";
-  r+="<input id=\"dok-kunde\" class=\"fi\" placeholder=\"Kundenname / Firma\" value=\""+esc(dok.kunde||"")+"\">";
+  r+="<div style=\"position:relative\">";
+  r+="<input id=\"dok-kunde\" class=\"fi\" placeholder=\"Kundenname / Firma\" value=\""+esc(dok.kunde||"")+"\" oninput=\"_kundenSuggest(this.value)\" autocomplete=\"off\" style=\"width:100%\">";
+  r+="<div id=\"dok-kunde-suggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-top:none;z-index:100;max-height:200px;overflow-y:auto\"></div>";
+  r+="<div style=\"display:flex;gap:5px;margin-top:4px\">";
+  r+="<button onclick=\"kundenSaveFromDok()\" style=\"background:var(--bg);border:1px solid var(--border);padding:4px 10px;font-size:10px;cursor:pointer;color:var(--text3)\">&#128190; Als Kunde speichern</button>";
+  r+="</div>";
+  r+="</div>";
   r+="<textarea id=\"dok-adresse\" class=\"fi\" placeholder=\"Adresse\" style=\"min-height:55px;resize:vertical\">"+esc(dok.adresse||"")+"</textarea>";
   r+="<input id=\"dok-fahrzeug\" class=\"fi\" placeholder=\"Fahrzeug (z.B. W107 300 SL)\" value=\""+esc(dok.fahrzeug||"")+"\">";
   r+="</div></div>";
@@ -4182,7 +4363,23 @@ function dokPrint(id){
   var db=docsDB(),dok=null;
   for(var i=0;i<db.dokumente.length;i++)if(db.dokumente[i].id===id){dok=db.dokumente[i];break;}
   if(!dok)return;
-  var firma=APP.smp.ag?APP.smp.ag.firma:{name:"Riedel classics",str:"",ort:"",tel:""};
+  var firma={name:"Riedel classics",str:"Esslinger Str. 5",ort:"73249 Wernau",tel:"",mail:""};
+  if(APP.data&&APP.data.settings&&APP.data.settings.firma){
+    var sf=APP.data.settings.firma;
+    if(sf.name) firma.name=sf.name;
+    if(sf.str)  firma.str=sf.str;
+    if(sf.ort)  firma.ort=sf.ort;
+    if(sf.tel)  firma.tel=sf.tel;
+    if(sf.mail) firma.mail=sf.mail;
+  }
+  if(APP.smp.ag&&APP.smp.ag.firma){
+    var af=APP.smp.ag.firma;
+    if(af.name) firma.name=af.name;
+    if(af.str)  firma.str=af.str;
+    if(af.ort)  firma.ort=af.ort;
+    if(af.tel)  firma.tel=af.tel;
+    if(af.mail) firma.mail=af.mail;
+  }
   var sum=docCalcSum(dok.positionen,dok.mwstSatz,dok.mitMwst);
   var typ=docStatusLabel(dok.status),nr=dok.rechnungNr||dok.nr||"",datum=dok.rechnungDatum||dok.datum||"";
   var faellig="";
