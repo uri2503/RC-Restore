@@ -4226,28 +4226,51 @@ function dokPrint(id){
   var w=window.open("","_blank","width=900,height=1000");
   var html="<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"UTF-8\"><title>"+typ+" "+nr+"</title><style>"+css+"</style></head><body>";
 
-  // Header
-  html+="<div style=\"display:flex;justify-content:space-between;padding-bottom:16px;border-bottom:3px solid #c41230;margin-bottom:22px\">";
-  html+="<div><div style=\"font-size:24px;font-weight:700;letter-spacing:-1px\">Riedel <span style=\"font-weight:300;letter-spacing:3px;font-size:18px\">classics</span></div>";
-  html+="<div style=\"font-size:9px;letter-spacing:2px;color:#888;margin-top:2px\">...mit Liebe zum Detail</div>";
-  if(firma.str) html+="<div style=\"margin-top:10px;font-size:11px;color:#666\">"+esc(firma.str)+"<br>"+esc(firma.ort||"")+(firma.tel?"<br>"+esc(firma.tel):"")+"</div>";
+  // ── HEADER: Logo links, Firmendaten + Dok-Info rechts ──
+  html+="<div style=\"display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid #c41230;margin-bottom:24px\">";
+  // Links: Logo
+  html+="<div>";
+  html+="<div style=\"font-size:26px;font-weight:700;letter-spacing:-1px;line-height:1\">Riedel <span style=\"font-weight:300;letter-spacing:4px;font-size:19px\">classics</span></div>";
+  html+="<div style=\"font-size:9px;letter-spacing:2px;color:#888;margin-top:3px\">...mit Liebe zum Detail</div>";
   html+="</div>";
+  // Rechts: Firmendaten + Dokumentinfo
   html+="<div style=\"text-align:right\">";
-  html+="<div style=\"font-size:22px;font-weight:700;color:#c41230\">"+typ+"</div>";
-  html+="<div style=\"font-size:15px;font-family:monospace;margin-top:3px;color:#333\">"+nr+"</div>";
-  html+="<div style=\"font-size:11px;color:#666;margin-top:5px\">Datum: "+new Date(datum).toLocaleDateString("de-DE")+"</div>";
-  if(faellig) html+="<div style=\"font-size:11px;color:#c41230;font-weight:600;margin-top:2px\">Fällig: "+faellig+"</div>";
-  html+="</div></div>";
-
-  // Recipient
-  if(dok.kunde){
-    html+="<div style=\"margin-bottom:22px;padding:12px 16px;background:#f9f9f9;border-left:3px solid #c41230\">";
-    html+="<div style=\"font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px\">An</div>";
-    html+="<div style=\"font-weight:700;font-size:13px\">"+esc(dok.kunde)+"</div>";
-    if(dok.adresse) html+="<div style=\"font-size:12px;color:#444;margin-top:3px;white-space:pre-line\">"+esc(dok.adresse)+"</div>";
-    if(dok.fahrzeug) html+="<div style=\"font-size:11px;color:#888;margin-top:5px;font-style:italic\">Fahrzeug: "+esc(dok.fahrzeug)+"</div>";
+  // Firmendaten
+  if(firma.name||firma.str){
+    html+="<div style=\"font-size:11px;color:#444;line-height:1.6;margin-bottom:10px\">";
+    if(firma.name) html+="<b>"+esc(firma.name)+"</b><br>";
+    if(firma.str)  html+=esc(firma.str)+"<br>";
+    if(firma.ort)  html+=esc(firma.ort)+"<br>";
+    if(firma.tel)  html+="Tel: "+esc(firma.tel)+"<br>";
+    if(firma.mail) html+=esc(firma.mail);
     html+="</div>";
   }
+  // Dokumenttyp + Nr
+  html+="<div style=\"font-size:26px;font-weight:800;color:#c41230;letter-spacing:-1px\">"+typ+"</div>";
+  html+="<div style=\"font-size:16px;font-family:monospace;font-weight:700;color:#333;margin-top:2px\">"+nr+"</div>";
+  html+="<div style=\"font-size:11px;color:#666;margin-top:6px\">Datum: "+new Date(datum).toLocaleDateString("de-DE")+"</div>";
+  if(faellig) html+="<div style=\"font-size:11px;color:#c41230;font-weight:700;margin-top:2px\">Fällig: "+faellig+"</div>";
+  html+="</div>";
+  html+="</div>";
+
+  // ── EMPFÄNGER + FAHRZEUG (Briefkopf-Style) ──
+  html+="<div style=\"display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px\">";
+  // Empfänger links
+  html+="<div style=\"min-width:260px\">";
+  html+="<div style=\"font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px\">"+esc(firma.name||"Riedel classics")+" · "+esc(firma.str||"")+" · "+esc(firma.ort||"")+"</div>";
+  html+="<div style=\"border-top:1px solid #ddd;padding-top:8px\">";
+  if(dok.kunde) html+="<div style=\"font-weight:700;font-size:13px\">"+esc(dok.kunde)+"</div>";
+  if(dok.adresse) html+="<div style=\"font-size:12px;color:#444;margin-top:3px;white-space:pre-line;line-height:1.6\">"+esc(dok.adresse)+"</div>";
+  if(!dok.kunde&&!dok.adresse) html+="<div style=\"font-size:12px;color:#aaa;font-style:italic\">Kein Empfänger angegeben</div>";
+  html+="</div></div>";
+  // Fahrzeug + Auftragsbezug rechts
+  html+="<div style=\"text-align:right;font-size:11px;color:#666\">";
+  if(dok.fahrzeug) html+="<div style=\"background:#f5f5f5;padding:8px 14px;border-left:3px solid #c41230;text-align:left\">"
+    +"<div style=\"font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:3px\">Fahrzeug</div>"
+    +"<div style=\"font-weight:700;font-size:12px;color:#1a1a1a\">"+esc(dok.fahrzeug)+"</div></div>";
+  if(dok.projekt) html+="<div style=\"margin-top:6px;font-size:10px;color:#888\">Projekt: <b style=\"color:#444\">"+esc(dok.projekt)+"</b></div>";
+  html+="</div>";
+  html+="</div>";
 
   // ARBEITSLEISTUNGEN
   if(arbPos.length>0){
