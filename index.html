@@ -2092,7 +2092,10 @@ try{
     mitarbeiter:APP.smp.mitarbeiter||[],
     kw:APP.smp.kw||[],
     auf:APP.smp.auf||[],
-    id:APP.smp.id||[]
+    id:APP.smp.id||[],
+    ag:APP.smp.ag||null,
+    rcdev:APP.smp.rcdev||null,
+    docs:APP.smp.docs||null
   };
   var backup={
     version:'4.0',
@@ -2119,11 +2122,23 @@ try{
   var raw=e.target.result;
   var backup=JSON.parse(raw);
   var rmData=null,smpData={};
-  if(backup.rm&&(backup.rm.vehicles||backup.rm.projects)){rmData=backup.rm;smpData=backup.smp||{};}
-  else if(backup.data&&(backup.data.vehicles||backup.data.projects)){rmData=backup.data;smpData=backup.data;}
-  else if(backup.vehicles||backup.projects){rmData=backup;smpData={};}
-  else if(backup.smp&&!backup.rm){rmData=APP.data;smpData=backup.smp;}
-  else{toast('Unbekanntes Format. Felder: '+Object.keys(backup).slice(0,6).join(', '),'err');return;}
+  if(backup.rm&&(backup.rm.vehicles||backup.rm.projects)){
+    rmData=backup.rm;smpData=backup.smp||{};
+  } else if(backup.cr&&(backup.cr.vehicles||backup.cr.projects)){
+    rmData=backup.cr;smpData=backup.smp||{};
+  } else if(backup.data&&(backup.data.vehicles||backup.data.projects)){
+    rmData=backup.data;smpData=backup.smp||backup.data||{};
+  } else if(backup.vehicles||backup.projects){
+    rmData=backup;smpData={};
+  } else if(backup.smp&&!backup.rm&&!backup.cr){
+    rmData=APP.data;smpData=backup.smp;
+  } else if(backup.version&&(backup.appName||backup.exportDate)){
+    // New format v4+ with any structure
+    rmData=backup.rm||backup.cr||backup.data||APP.data;
+    smpData=backup.smp||{};
+  } else {
+    toast('Unbekanntes Format. Felder: '+Object.keys(backup).slice(0,8).join(', '),'err');return;
+  }
   var fmt=backup.rm?'Kombiniert v4':backup.vehicles?'RM Classic':'SMP';
   var info=fmt+' | '+Math.round(raw.length/1024)+'KB';
   if(rmData.vehicles) info+=' | '+rmData.vehicles.length+' Fzg';
@@ -2155,6 +2170,9 @@ try{
   if(smpData.kundenprojekte) APP.smp.kundenprojekte=smpData.kundenprojekte;
   if(smpData.mitarbeiter) APP.smp.mitarbeiter=smpData.mitarbeiter;
   if(smpData.arbeitsgaenge) APP.smp.arbeitsgaenge=smpData.arbeitsgaenge;
+  if(smpData.ag) APP.smp.ag=smpData.ag;
+  if(smpData.rcdev) APP.smp.rcdev=smpData.rcdev;
+  if(smpData.docs) APP.smp.docs=smpData.docs;
   saveData();
   toast((rmData.vehicles.length||0)+' Fzg, '+(rmData.projects.length||0)+' Proj importiert','ok');
   setTimeout(function(){nav('dashboard');},800);
@@ -3962,7 +3980,7 @@ if(mc)mc.innerHTML="<div style=\"padding:20px;background:#fde8ec;border-radius:8
 
 
 // ── AG MODULE ────────────────────────────────────────────────────
-function agDB(){smpDB();if(!APP.smp.ag)APP.smp.ag={teileHistory:[],teileRecherche:[],firma:{name:"Riedel classics",str:"",ort:"",tel:"",mail:"",mwst:false,mwstSatz:19},ss:[{name:"Mechanik",preis:109},{name:"Lackierung",preis:149},{name:"Karosserie",preis:109},{name:"Polsterer",preis:95}],kalk:{arbeit:[],material:[]},savedKalks:[]};if(!APP.smp.ag.teileRecherche)APP.smp.ag.teileRecherche=[];return APP.smp.ag;}
+function agDB(){smpDB();if(!APP.smp.ag)APP.smp.ag={teileHistory:[],teileRecherche:[],firma:{name:"Riedel classics",str:"",ort:"",tel:"",mail:"",mwst:false,mwstSatz:19,ustId:"",steuernr:"",iban:"",bic:"",bank:""},ss:[{name:"Mechanik",preis:109},{name:"Lackierung",preis:149},{name:"Karosserie",preis:109},{name:"Polsterer",preis:95}],kalk:{arbeit:[],material:[]},savedKalks:[]};if(!APP.smp.ag.teileRecherche)APP.smp.ag.teileRecherche=[];return APP.smp.ag;}
 function agSave(){saveDB();}
 function agFmt(n){return Number(n||0).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function agNum(s){return parseFloat(String(s||0).replace(",","."))||0;}
@@ -4054,7 +4072,7 @@ function agDelSS(i){var db=agDB();db.ss.splice(i,1);agSave();renderSMPPage("kalk
 function agUpdSS(i,v){var db=agDB();if(db.ss[i])db.ss[i].preis=agNum(v);agSave();}
 function agSaveFirma(){
   var db=agDB();
-  db.firma={name:(document.getElementById("ag-f-name")||{}).value||"",str:(document.getElementById("ag-f-str")||{}).value||"",ort:(document.getElementById("ag-f-ort")||{}).value||"",tel:(document.getElementById("ag-f-tel")||{}).value||"",mwst:!!(document.getElementById("ag-f-mwst")||{}).checked,mwstSatz:agNum((document.getElementById("ag-f-mwstsatz")||{}).value)||19};
+  db.firma={name:(document.getElementById("ag-f-name")||{}).value||"",str:(document.getElementById("ag-f-str")||{}).value||"",ort:(document.getElementById("ag-f-ort")||{}).value||"",tel:(document.getElementById("ag-f-tel")||{}).value||"",mail:(document.getElementById("ag-f-mail")||{}).value||"",mwst:!!(document.getElementById("ag-f-mwst")||{}).checked,mwstSatz:agNum((document.getElementById("ag-f-mwstsatz")||{}).value)||19,ustId:(document.getElementById("ag-f-ustid")||{}).value||"",steuernr:(document.getElementById("ag-f-steuernr")||{}).value||"",iban:(document.getElementById("ag-f-iban")||{}).value||"",bic:(document.getElementById("ag-f-bic")||{}).value||"",bank:(document.getElementById("ag-f-bank")||{}).value||""};
   agSave();toast("Firmendaten gespeichert","ok");
 }
 function agCalcSum(){
@@ -4233,6 +4251,14 @@ function rKalkulation(){
   r+="<input class=\"fi\" id=\"ag-f-str\" placeholder=\"Stra\u00dfe + Nr.\" value=\""+esc(firma.str||"")+"\">";
   r+="<input class=\"fi\" id=\"ag-f-ort\" placeholder=\"PLZ + Ort\" value=\""+esc(firma.ort||"")+"\">";
   r+="<input class=\"fi\" id=\"ag-f-tel\" placeholder=\"Telefon\" value=\""+esc(firma.tel||"")+"\">";
+  r+="<input class=\"fi\" id=\"ag-f-mail\" placeholder=\"E-Mail\" value=\""+esc(firma.mail||"")+"\">";
+  r+="<input class=\"fi\" id=\"ag-f-ustid\" placeholder=\"USt-ID (z.B. DE123456789)\" value=\""+esc(firma.ustId||"")+"\">";
+  r+="<input class=\"fi\" id=\"ag-f-steuernr\" placeholder=\"Steuernummer\" value=\""+esc(firma.steuernr||"")+"\">";
+  r+="<input class=\"fi\" id=\"ag-f-iban\" placeholder=\"IBAN\" value=\""+esc(firma.iban||"")+"\" style=\"font-family:monospace\">";
+  r+="<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:6px\">";
+  r+="<input class=\"fi\" id=\"ag-f-bic\" placeholder=\"BIC\" value=\""+esc(firma.bic||"")+"\" style=\"font-family:monospace\">";
+  r+="<input class=\"fi\" id=\"ag-f-bank\" placeholder=\"Bank\" value=\""+esc(firma.bank||"")+"\">";
+  r+="</div>";
   r+="<div style=\"display:flex;align-items:center;gap:8px\"><label style=\"font-size:12px\"><input type=\"checkbox\""+(firma.mwst?" checked":"")+" id=\"ag-f-mwst\"> MwSt.</label><input type=\"number\" id=\"ag-f-mwstsatz\" value=\""+(firma.mwstSatz||19)+"\" style=\"width:45px;padding:4px;border:1px solid var(--border);background:var(--bg);font-size:12px\"> %</div>";
   r+="<button onclick=\"agSaveFirma()\" style=\"background:var(--red);color:#fff;border:none;padding:7px;font-size:11px;font-weight:600;cursor:pointer\">Speichern</button>";
   r+="</div></div></div>"+savedH;
@@ -4593,9 +4619,13 @@ function dokSave(){
   DOK_NEW.datum=(document.getElementById("dok-datum")||{}).value||DOK_NEW.datum;
   DOK_NEW.projekt=(document.getElementById("dok-projekt")||{}).value||"";
   DOK_NEW.zahlungsziel=agNum((document.getElementById("dok-zahlung")||{}).value)||14;
+  DOK_NEW.llDatum=(document.getElementById("dok-lldatum")||{}).value||"";
+  DOK_NEW.gruppe=(document.getElementById("dok-gruppe")||{}).value||"";
   DOK_NEW.kunde=(document.getElementById("dok-kunde")||{}).value||"";
   DOK_NEW.adresse=(document.getElementById("dok-adresse")||{}).value||"";
   DOK_NEW.fahrzeug=(document.getElementById("dok-fahrzeug")||{}).value||"";
+  DOK_NEW.kennzeichen=(document.getElementById("dok-kz")||{}).value||"";
+  DOK_NEW.fin=(document.getElementById("dok-fin")||{}).value||"";
   DOK_NEW.notiz=(document.getElementById("dok-notiz")||{}).value||"";
   DOK_NEW.mitMwst=!!(document.getElementById("dok-mwst")||{}).checked;
   DOK_NEW.mwstSatz=agNum((document.getElementById("dok-mwstsatz")||{}).value)||19;
@@ -4685,6 +4715,11 @@ function _rDokForm(dok,isEdit){
   r+="<div><label class=\"fl\">Datum</label><input id=\"dok-datum\" type=\"date\" class=\"fi\" value=\""+dok.datum+"\" style=\"width:100%\"></div>";
   r+="<div><label class=\"fl\">Projekt</label><select id=\"dok-projekt\" class=\"fsel\" style=\"width:100%\" onchange=\"_dokProjFill(this.value)\">"+projOpts+"</select></div>";
   r+="<div><label class=\"fl\">Zahlungsziel (Tage)</label><input id=\"dok-zahlung\" type=\"number\" class=\"fi\" value=\""+(dok.zahlungsziel||14)+"\" style=\"width:100%\"></div>";
+  r+="</div>";
+  r+="<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px\">";
+  r+="<div><label class=\"fl\">Liefer-/Leistungsdatum</label><input id=\"dok-lldatum\" type=\"date\" class=\"fi\" value=\""+( dok.llDatum||"")+"\" style=\"width:100%\"></div>";
+  r+="<div><label class=\"fl\">AZ Gruppierung</label><select id=\"dok-gruppe\" class=\"fsel\" style=\"width:100%\"><option value=\"\""+(!dok.gruppe?" selected":"")+">Keine (chronologisch)</option><option value=\"kategorie\""+(dok.gruppe==="kategorie"?" selected":"")+">Nach Kategorie</option><option value=\"kategorie-zs\""+(dok.gruppe==="kategorie-zs"?" selected":"")+">Kategorie + Zwischensumme</option></select></div>";
+  r+="<div style=\"display:none\"><!-- placeholder for grid alignment --></div>";
   r+="</div></div>";
   r+="<div class=\"card\" style=\"margin-bottom:12px\">";
   r+="<div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px\">Kunde</div>";
@@ -4697,7 +4732,11 @@ function _rDokForm(dok,isEdit){
   r+="</div>";
   r+="</div>";
   r+="<textarea id=\"dok-adresse\" class=\"fi\" placeholder=\"Adresse\" style=\"min-height:55px;resize:vertical\">"+esc(dok.adresse||"")+"</textarea>";
-  r+="<input id=\"dok-fahrzeug\" class=\"fi\" placeholder=\"Fahrzeug (z.B. W107 300 SL)\" value=\""+esc(dok.fahrzeug||"")+"\">";
+  r+="<input id=\"dok-fahrzeug\" class=\"fi\" placeholder=\"Fahrzeug (z.B. Mercedes W107 300 SL)\" value=\""+esc(dok.fahrzeug||"")+"\">";
+  r+="<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:7px\">";
+  r+="<input id=\"dok-kz\" class=\"fi\" placeholder=\"Kennzeichen (z.B. ES-UR 07)\" value=\""+esc(dok.kennzeichen||"")+"\">";
+  r+="<input id=\"dok-fin\" class=\"fi\" placeholder=\"FIN / Fahrgestellnummer\" value=\""+esc(dok.fin||"")+"\" style=\"font-family:monospace\">";
+  r+="</div>";
   r+="</div></div>";
   r+="<div class=\"card\">";
   r+="<div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px\">Notiz / Freitext</div>";
@@ -4763,29 +4802,13 @@ function dokPrint(id){
   var db=docsDB(),dok=null;
   for(var i=0;i<db.dokumente.length;i++)if(db.dokumente[i].id===id){dok=db.dokumente[i];break;}
   if(!dok)return;
-  var firma={name:"Riedel classics",str:"Esslinger Str. 5",ort:"73249 Wernau",tel:"",mail:""};
-  if(APP.data&&APP.data.settings&&APP.data.settings.firma){
-    var sf=APP.data.settings.firma;
-    if(sf.name) firma.name=sf.name;
-    if(sf.str)  firma.str=sf.str;
-    if(sf.ort)  firma.ort=sf.ort;
-    if(sf.tel)  firma.tel=sf.tel;
-    if(sf.mail) firma.mail=sf.mail;
-  }
-  if(APP.smp.ag&&APP.smp.ag.firma){
-    var af=APP.smp.ag.firma;
-    if(af.name) firma.name=af.name;
-    if(af.str)  firma.str=af.str;
-    if(af.ort)  firma.ort=af.ort;
-    if(af.tel)  firma.tel=af.tel;
-    if(af.mail) firma.mail=af.mail;
-  }
+  var firma=agDB().firma||{name:"Riedel classics",str:"Esslinger Str. 5",ort:"73249 Wernau"};
   var sum=docCalcSum(dok.positionen,dok.mwstSatz,dok.mitMwst);
   var typ=docStatusLabel(dok.status),nr=dok.rechnungNr||dok.nr||"",datum=dok.rechnungDatum||dok.datum||"";
   var faellig="";
   if(datum&&dok.zahlungsziel){var fd=new Date(datum);fd.setDate(fd.getDate()+(dok.zahlungsziel||14));faellig=fd.toLocaleDateString("de-DE");}
 
-  // Separate by type
+  // ── Sort and group Arbeit positions ──────────────────────────
   var arbPos=[],matPos=[],pausPos=[];
   for(var i=0;i<(dok.positionen||[]).length;i++){
     var p=dok.positionen[i];
@@ -4794,119 +4817,179 @@ function dokPrint(id){
     else pausPos.push(p);
   }
 
+  // Extract category from Bezeichnung (first word before " -" or "–")
+  function getKat(bez){
+    if(!bez)return"Sonstiges";
+    var m=(bez||"").match(/^([A-Za-z\u00c0-\u024f]+)/);
+    return m?m[1]:"Sonstiges";
+  }
+  // Extract date from Bezeichnung "(YYYY-MM-DD)"
+  function getDat(bez){
+    var m=(bez||"").match(/\((\d{4}-\d{2}-\d{2})\)/);
+    return m?m[1]:"";
+  }
+
+  var gruppe=dok.gruppe||"";
+  // Sort by category then date
+  if(gruppe==="kategorie"||gruppe==="kategorie-zs"){
+    arbPos.sort(function(a,b){
+      var ka=getKat(a.bez),kb=getKat(b.bez);
+      if(ka!==kb)return ka<kb?-1:1;
+      return getDat(a.bez)<getDat(b.bez)?-1:1;
+    });
+  } else {
+    // Chronological by date in Bezeichnung
+    arbPos.sort(function(a,b){return getDat(a.bez)<getDat(b.bez)?-1:1;});
+  }
+
+  // ── Build Arbeit rows (with optional category groups) ────────
   var sumArb=0,sumMat=0,sumPaus=0;
   for(var i=0;i<arbPos.length;i++) sumArb+=agNum(arbPos[i].std)*agNum(arbPos[i].satz||109);
   for(var i=0;i<matPos.length;i++){var vk=agNum(matPos[i].ek)*(1+agNum(matPos[i].auf||0)/100);sumMat+=vk*agNum(matPos[i].menge||1);}
   for(var i=0;i<pausPos.length;i++) sumPaus+=agNum(pausPos[i].preis);
 
-  var css='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Helvetica,Arial,sans-serif;font-size:11.5px;color:#1a1a1a;padding:28px}table{width:100%;border-collapse:collapse;margin-bottom:4px}th{background:#f5f5f5;padding:6px 10px;text-align:left;border-bottom:2px solid #ddd;font-size:10px;text-transform:uppercase;letter-spacing:1px}td{padding:6px 10px;border-bottom:1px solid #eee}.tot{font-weight:700;background:#f5f5f5}.zs{font-weight:700;background:#f0f0f0;border-top:2px solid #ddd}.sec{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700}.grand{font-size:14px;font-weight:800;color:#c41230;border-top:3px solid #c41230;padding-top:10px;margin-top:4px}td.r{text-align:right}th.r{text-align:right}@media print{@page{margin:15mm}body{padding:0}}';
-
   var arbRows="";
-  for(var i=0;i<arbPos.length;i++){
-    var p=arbPos[i],bet=agNum(p.std)*agNum(p.satz||109);
-    arbRows+="<tr><td>"+esc(p.bez||"")+"</td><td class=\"r\" style=\"white-space:nowrap;width:80px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td class=\"r\" style=\"width:90px\">"+agFmt(agNum(p.satz||109))+" €/h</td><td class=\"r\" style=\"width:100px;font-weight:600\">"+agFmt(bet)+" €</td></tr>";
+  if(gruppe==="kategorie-zs"){
+    var curKat="",katSum=0;
+    for(var i=0;i<arbPos.length;i++){
+      var p=arbPos[i],kat=getKat(p.bez),bet=agNum(p.std)*agNum(p.satz||109);
+      // New category → emit subtotal for previous
+      if(kat!==curKat){
+        if(curKat&&katSum>0){
+          arbRows+="<tr style=\"background:#f5f5f5\"><td colspan=\"3\" style=\"font-weight:600;font-style:italic;font-size:10px;padding:4px 10px\">Zwischensumme "+esc(curKat)+"</td><td style=\"text-align:right;font-weight:700;padding:4px 10px\">"+agFmt(katSum)+" \u20ac</td></tr>";
+          katSum=0;
+        }
+        arbRows+="<tr><td colspan=\"4\" style=\"background:#f9f9f9;padding:5px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;border-top:2px solid #eee\">"+esc(kat)+"</td></tr>";
+        curKat=kat;
+      }
+      arbRows+="<tr><td>"+esc(p.bez||"")+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
+      katSum+=bet;
+    }
+    if(curKat&&katSum>0){
+      arbRows+="<tr style=\"background:#f5f5f5\"><td colspan=\"3\" style=\"font-weight:600;font-style:italic;font-size:10px;padding:4px 10px\">Zwischensumme "+esc(curKat)+"</td><td style=\"text-align:right;font-weight:700;padding:4px 10px\">"+agFmt(katSum)+" \u20ac</td></tr>";
+    }
+  } else if(gruppe==="kategorie"){
+    var curKat2="";
+    for(var i=0;i<arbPos.length;i++){
+      var p=arbPos[i],kat=getKat(p.bez),bet=agNum(p.std)*agNum(p.satz||109);
+      if(kat!==curKat2){
+        arbRows+="<tr><td colspan=\"4\" style=\"background:#f9f9f9;padding:5px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;border-top:2px solid #eee\">"+esc(kat)+"</td></tr>";
+        curKat2=kat;
+      }
+      arbRows+="<tr><td>"+esc(p.bez||"")+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
+    }
+  } else {
+    for(var i=0;i<arbPos.length;i++){
+      var p=arbPos[i],bet=agNum(p.std)*agNum(p.satz||109);
+      arbRows+="<tr><td>"+esc(p.bez||"")+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
+    }
   }
 
   var matRows="";
   for(var i=0;i<matPos.length;i++){
     var p=matPos[i],vk=agNum(p.ek)*(1+agNum(p.auf||0)/100),bet=vk*agNum(p.menge||1);
     var det=(p.nr?"<br><span style=\"font-size:10px;color:#888;font-family:monospace\">"+esc(p.nr)+"</span>":"");
-    matRows+="<tr><td>"+esc(p.bez||"")+det+"</td><td class=\"r\" style=\"width:60px\">"+(agNum(p.menge)||1)+" Stk.</td><td class=\"r\" style=\"width:90px\">"+agFmt(vk)+" €</td><td class=\"r\" style=\"width:100px;font-weight:600\">"+agFmt(bet)+" €</td></tr>";
+    matRows+="<tr><td>"+esc(p.bez||"")+det+"</td><td style=\"text-align:right;width:60px\">"+(agNum(p.menge)||1)+" Stk.</td><td style=\"text-align:right;width:90px\">"+agFmt(vk)+" \u20ac</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
   }
 
   var pausRows="";
   for(var i=0;i<pausPos.length;i++){
     var p=pausPos[i];
-    pausRows+="<tr><td colspan=\"3\">"+esc(p.bez||"")+"</td><td class=\"r\" style=\"width:100px;font-weight:600\">"+agFmt(agNum(p.preis))+" €</td></tr>";
+    pausRows+="<tr><td colspan=\"3\">"+esc(p.bez||"")+"</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(agNum(p.preis))+" \u20ac</td></tr>";
   }
 
-  var w=window.open("","_blank","width=900,height=1000");
+  var css="*{box-sizing:border-box;margin:0;padding:0}body{font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#1a1a1a;padding:28px}table{width:100%;border-collapse:collapse;margin-bottom:4px}th{background:#f5f5f5;padding:6px 10px;text-align:left;border-bottom:2px solid #ddd;font-size:10px;text-transform:uppercase;letter-spacing:1px}td{padding:6px 10px;border-bottom:1px solid #eee}.tot{font-weight:700;background:#f5f5f5}.zs{font-weight:700;background:#f0f0f0;border-top:2px solid #ddd}.sec{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700}.grand{font-size:14px;font-weight:800;color:#c41230;border-top:3px solid #c41230;padding-top:10px;margin-top:4px}td.r{text-align:right}th.r{text-align:right}@media print{@page{margin:15mm}body{padding:0}}";
+
+  var w=window.open("","_blank","width=950,height=1100");
   var html="<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"UTF-8\"><title>"+typ+" "+nr+"</title><style>"+css+"</style></head><body>";
 
-  // ── HEADER: Logo links, Firmendaten + Dok-Info rechts ──
-  html+="<div style=\"display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid #c41230;margin-bottom:24px\">";
-  // Links: Logo
-  html+="<div>";
-  html+="<div style=\"font-size:26px;font-weight:700;letter-spacing:-1px;line-height:1\">Riedel <span style=\"font-weight:300;letter-spacing:4px;font-size:19px\">classics</span></div>";
-  html+="<div style=\"font-size:9px;letter-spacing:2px;color:#888;margin-top:3px\">...mit Liebe zum Detail</div>";
-  html+="</div>";
-  // Rechts: Firmendaten + Dokumentinfo
+  // ── HEADER ───────────────────────────────────────────────────
+  html+="<div style=\"display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid #c41230;margin-bottom:20px\">";
+  html+="<div><div style=\"font-size:26px;font-weight:700;letter-spacing:-1px;line-height:1\">Riedel <span style=\"font-weight:300;letter-spacing:4px;font-size:19px\">classics</span></div>";
+  html+="<div style=\"font-size:9px;letter-spacing:2px;color:#888;margin-top:3px\">...mit Liebe zum Detail</div></div>";
   html+="<div style=\"text-align:right\">";
-  // Firmendaten
-  if(firma.name||firma.str){
-    html+="<div style=\"font-size:11px;color:#444;line-height:1.6;margin-bottom:10px\">";
-    if(firma.name) html+="<b>"+esc(firma.name)+"</b><br>";
-    if(firma.str)  html+=esc(firma.str)+"<br>";
-    if(firma.ort)  html+=esc(firma.ort)+"<br>";
-    if(firma.tel)  html+="Tel: "+esc(firma.tel)+"<br>";
-    if(firma.mail) html+=esc(firma.mail);
-    html+="</div>";
-  }
-  // Dokumenttyp + Nr
+  // Firmendaten kompakt
+  html+="<div style=\"font-size:10.5px;color:#444;line-height:1.55;margin-bottom:8px\">";
+  if(firma.name) html+="<b>"+esc(firma.name)+"</b><br>";
+  if(firma.str)  html+=esc(firma.str)+"<br>";
+  if(firma.ort)  html+=esc(firma.ort)+"<br>";
+  if(firma.tel)  html+="Tel: "+esc(firma.tel)+"<br>";
+  if(firma.mail) html+=esc(firma.mail)+"<br>";
+  if(firma.ustId) html+="USt-ID: "+esc(firma.ustId)+"<br>";
+  if(firma.steuernr) html+="St-Nr: "+esc(firma.steuernr);
+  html+="</div>";
   html+="<div style=\"font-size:26px;font-weight:800;color:#c41230;letter-spacing:-1px\">"+typ+"</div>";
-  html+="<div style=\"font-size:16px;font-family:monospace;font-weight:700;color:#333;margin-top:2px\">"+nr+"</div>";
-  html+="<div style=\"font-size:11px;color:#666;margin-top:6px\">Datum: "+new Date(datum).toLocaleDateString("de-DE")+"</div>";
-  if(faellig) html+="<div style=\"font-size:11px;color:#c41230;font-weight:700;margin-top:2px\">Fällig: "+faellig+"</div>";
-  html+="</div>";
-  html+="</div>";
+  html+="<div style=\"font-size:15px;font-family:monospace;font-weight:700;color:#333;margin-top:2px\">"+nr+"</div>";
+  html+="<div style=\"font-size:10.5px;color:#666;margin-top:5px\">Datum: "+new Date(datum).toLocaleDateString("de-DE")+"</div>";
+  if(dok.llDatum) html+="<div style=\"font-size:10.5px;color:#444;margin-top:2px\">Liefer-/Leistungsdatum: "+new Date(dok.llDatum).toLocaleDateString("de-DE")+"</div>";
+  if(faellig) html+="<div style=\"font-size:10.5px;color:#c41230;font-weight:700;margin-top:2px\">F\u00e4llig: "+faellig+"</div>";
+  html+="</div></div>";
 
-  // ── EMPFÄNGER + FAHRZEUG (Briefkopf-Style) ──
-  html+="<div style=\"display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px\">";
-  // Empfänger links
+  // ── EMPFÄNGER + FAHRZEUG ──────────────────────────────────────
+  html+="<div style=\"display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px\">";
   html+="<div style=\"min-width:260px\">";
-  html+="<div style=\"font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px\">"+esc(firma.name||"Riedel classics")+" · "+esc(firma.str||"")+" · "+esc(firma.ort||"")+"</div>";
+  html+="<div style=\"font-size:8.5px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px\">"+esc(firma.name||"")+" \u00b7 "+esc(firma.str||"")+" \u00b7 "+esc(firma.ort||"")+"</div>";
   html+="<div style=\"border-top:1px solid #ddd;padding-top:8px\">";
   if(dok.kunde) html+="<div style=\"font-weight:700;font-size:13px\">"+esc(dok.kunde)+"</div>";
-  if(dok.adresse) html+="<div style=\"font-size:12px;color:#444;margin-top:3px;white-space:pre-line;line-height:1.6\">"+esc(dok.adresse)+"</div>";
-  if(!dok.kunde&&!dok.adresse) html+="<div style=\"font-size:12px;color:#aaa;font-style:italic\">Kein Empfänger angegeben</div>";
+  if(dok.adresse) html+="<div style=\"font-size:11px;color:#444;margin-top:3px;white-space:pre-line;line-height:1.6\">"+esc(dok.adresse)+"</div>";
+  if(!dok.kunde&&!dok.adresse) html+="<div style=\"font-size:11px;color:#aaa;font-style:italic\">Kein Empf\u00e4nger</div>";
   html+="</div></div>";
-  // Fahrzeug + Auftragsbezug rechts
-  html+="<div style=\"text-align:right;font-size:11px;color:#666\">";
-  if(dok.fahrzeug) html+="<div style=\"background:#f5f5f5;padding:8px 14px;border-left:3px solid #c41230;text-align:left\">"
-    +"<div style=\"font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:3px\">Fahrzeug</div>"
-    +"<div style=\"font-weight:700;font-size:12px;color:#1a1a1a\">"+esc(dok.fahrzeug)+"</div></div>";
-  if(dok.projekt) html+="<div style=\"margin-top:6px;font-size:10px;color:#888\">Projekt: <b style=\"color:#444\">"+esc(dok.projekt)+"</b></div>";
-  html+="</div>";
+  // Fahrzeugdaten
+  if(dok.fahrzeug||dok.kennzeichen||dok.fin){
+    html+="<div style=\"background:#f9f9f9;padding:10px 14px;border-left:3px solid #c41230;font-size:10.5px\">";
+    html+="<div style=\"font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:5px\">Fahrzeug</div>";
+    if(dok.fahrzeug) html+="<div style=\"font-weight:700;font-size:12px;color:#1a1a1a;margin-bottom:3px\">"+esc(dok.fahrzeug)+"</div>";
+    if(dok.kennzeichen) html+="<div>Kennzeichen: <b>"+esc(dok.kennzeichen)+"</b></div>";
+    if(dok.fin) html+="<div style=\"font-family:monospace;font-size:10px;color:#555;margin-top:2px\">FIN: "+esc(dok.fin)+"</div>";
+    if(dok.projekt) html+="<div style=\"margin-top:4px;font-size:10px;color:#888\">Projekt: "+esc(dok.projekt)+"</div>";
+    html+="</div>";
+  }
   html+="</div>";
 
-  // ARBEITSLEISTUNGEN
+  // ── POSITIONEN ───────────────────────────────────────────────
   if(arbPos.length>0){
     html+="<div class=\"sec\">Arbeitsleistungen</div>";
-    html+="<table><thead><tr><th>Bezeichnung</th><th class=\"r\" style=\"width:80px\">Stunden</th><th class=\"r\" style=\"width:90px\">Stundensatz</th><th class=\"r\" style=\"width:100px\">Betrag</th></tr></thead><tbody>"+arbRows+"</tbody>";
-    html+="<tfoot><tr class=\"zs\"><td colspan=\"3\">Zwischensumme Arbeitsleistungen</td><td class=\"r\">"+agFmt(sumArb)+" €</td></tr></tfoot></table>";
+    html+="<table><thead><tr><th>Bezeichnung</th><th class=\"r\" style=\"width:75px\">Stunden</th><th class=\"r\" style=\"width:90px\">Stundensatz</th><th class=\"r\" style=\"width:100px\">Betrag</th></tr></thead><tbody>"+arbRows+"</tbody>";
+    html+="<tfoot><tr class=\"zs\"><td colspan=\"3\">Zwischensumme Arbeitsleistungen</td><td style=\"text-align:right;font-weight:700\">"+agFmt(sumArb)+" \u20ac</td></tr></tfoot></table>";
   }
-
-  // MATERIAL
   if(matPos.length>0){
     html+="<div class=\"sec\">Material &amp; Ersatzteile</div>";
     html+="<table><thead><tr><th>Bezeichnung</th><th class=\"r\" style=\"width:60px\">Menge</th><th class=\"r\" style=\"width:90px\">Einzelpreis</th><th class=\"r\" style=\"width:100px\">Betrag</th></tr></thead><tbody>"+matRows+"</tbody>";
-    html+="<tfoot><tr class=\"zs\"><td colspan=\"3\">Zwischensumme Material</td><td class=\"r\">"+agFmt(sumMat)+" €</td></tr></tfoot></table>";
+    html+="<tfoot><tr class=\"zs\"><td colspan=\"3\">Zwischensumme Material</td><td style=\"text-align:right;font-weight:700\">"+agFmt(sumMat)+" \u20ac</td></tr></tfoot></table>";
   }
-
-  // PAUSCHAL
   if(pausPos.length>0){
     html+="<div class=\"sec\">Pauschalpositionen</div>";
     html+="<table><thead><tr><th colspan=\"3\">Bezeichnung</th><th class=\"r\" style=\"width:100px\">Betrag</th></tr></thead><tbody>"+pausRows+"</tbody>";
-    html+="<tfoot><tr class=\"zs\"><td colspan=\"3\">Zwischensumme Pauschal</td><td class=\"r\">"+agFmt(sumPaus)+" €</td></tr></tfoot></table>";
+    html+="<tfoot><tr class=\"zs\"><td colspan=\"3\">Zwischensumme Pauschal</td><td style=\"text-align:right;font-weight:700\">"+agFmt(sumPaus)+" \u20ac</td></tr></tfoot></table>";
   }
 
-  // GESAMT
-  html+="<div style=\"max-width:340px;margin-left:auto;margin-top:18px\">";
+  // ── GESAMT ───────────────────────────────────────────────────
+  html+="<div style=\"max-width:360px;margin-left:auto;margin-top:20px\">";
   html+="<table><tbody>";
-  html+="<tr><td style=\"font-weight:600\">Gesamt netto</td><td class=\"r\" style=\"width:120px;font-weight:600\">"+agFmt(sum.net)+" €</td></tr>";
+  html+="<tr><td style=\"font-weight:600\">Gesamt netto</td><td style=\"text-align:right;width:130px;font-weight:600\">"+agFmt(sum.net)+" \u20ac</td></tr>";
   if(dok.mitMwst){
-    html+="<tr><td style=\"color:#666\">MwSt. "+dok.mwstSatz+"%</td><td class=\"r\" style=\"color:#666\">"+agFmt(sum.mwst)+" €</td></tr>";
-    html+="<tr class=\"grand\"><td>Gesamtbetrag brutto</td><td class=\"r\">"+agFmt(sum.gross)+" €</td></tr>";
+    html+="<tr><td style=\"color:#666\">MwSt. "+dok.mwstSatz+"%</td><td style=\"text-align:right;color:#666\">"+agFmt(sum.mwst)+" \u20ac</td></tr>";
+    html+="<tr><td colspan=\"2\" style=\"padding:0\"><div class=\"grand\" style=\"display:flex;justify-content:space-between\"><span>Gesamtbetrag brutto</span><span>"+agFmt(sum.gross)+" \u20ac</span></div></td></tr>";
   } else {
-    html+="<tr class=\"grand\"><td>Gesamtbetrag</td><td class=\"r\">"+agFmt(sum.gross)+" €</td></tr>";
+    html+="<tr><td colspan=\"2\" style=\"padding:0\"><div class=\"grand\" style=\"display:flex;justify-content:space-between\"><span>Gesamtbetrag</span><span>"+agFmt(sum.gross)+" \u20ac</span></div></td></tr>";
   }
   html+="</tbody></table></div>";
 
-  // Notiz
-  if(dok.notiz) html+="<div style=\"margin-top:24px;padding:12px 16px;background:#f9f9f9;border-left:3px solid #c41230;font-size:11px;color:#444;white-space:pre-line\">"+esc(dok.notiz)+"</div>";
+  // ── NOTIZ ─────────────────────────────────────────────────────
+  if(dok.notiz) html+="<div style=\"margin-top:22px;padding:12px 16px;background:#f9f9f9;border-left:3px solid #c41230;font-size:10.5px;color:#444;white-space:pre-line;line-height:1.6\">"+esc(dok.notiz)+"</div>";
 
-  // Footer
-  html+="<div style=\"margin-top:48px;padding-top:12px;border-top:1px solid #ddd;font-size:10px;color:#aaa;text-align:center\">Riedel classics · ...mit Liebe zum Detail</div>";
+  // ── BANKVERBINDUNG ────────────────────────────────────────────
+  if(firma.iban||firma.bank){
+    html+="<div style=\"margin-top:20px;padding-top:12px;border-top:1px solid #eee;font-size:10px;color:#666\">";
+    html+="<b>Bankverbindung:</b> ";
+    if(firma.bank) html+=esc(firma.bank)+" \u00b7 ";
+    if(firma.iban) html+="IBAN: "+esc(firma.iban)+" ";
+    if(firma.bic)  html+="\u00b7 BIC: "+esc(firma.bic);
+    html+="</div>";
+  }
+
+  // ── FOOTER ───────────────────────────────────────────────────
+  html+="<div style=\"margin-top:36px;padding-top:10px;border-top:1px solid #ddd;font-size:9.5px;color:#aaa;text-align:center\">Riedel classics \u00b7 ...mit Liebe zum Detail</div>";
   html+="</body></html>";
 
   w.document.write(html);
@@ -4916,8 +4999,9 @@ function dokPrint(id){
 
 // ── RC KNOW-HOW BRÜCKE ───────────────────────────────────────────
 function openKnowHow(query){
-  var url="https://uri2503.github.io/RC-KnowHow/";
-  if(query) url+="?q="+encodeURIComponent(query);
+  var base=(APP.data.settings&&APP.data.settings.knowhowUrl)||"https://uri2503.github.io/RC-KnowHow/";
+  var url=base;
+  if(query) url+=(url.indexOf("?")>=0?"&":"?")+"q="+encodeURIComponent(query);
   window.open(url,"_blank");
 }
 
@@ -4975,6 +5059,20 @@ function importFromKnowHow(file){
   };
   reader.readAsText(file,"UTF-8");
 }
+
+function saveKnowHowUrl(){
+  var el=document.getElementById("set-khurl");
+  if(!el)return;
+  var url=el.value.trim();
+  if(!url){toast("Bitte URL eingeben","err");return;}
+  if(!url.endsWith("/")) url+="/";
+  var d=D();
+  if(!d.settings) d.settings={};
+  d.settings.knowhowUrl=url;
+  saveDB();
+  toast("Know-How URL gespeichert","ok");
+}
 </script>
 </body>
-</html>
+</html>+"<div class=\\"card mb3\\"><div class=\\"fw tsm mb3\\">&#128218; Wissensdatenbank URL</div><div style=\\"font-size:11px;color:var(--text3);margin-bottom:8px\\">URL der RC Know-How App (GitHub Pages)</div><div style=\\"display:flex;gap:8px\\"><input id=\\"set-khurl\\" class=\\"fi\\" style=\\"flex:1\\" placeholder=\\"https://uri2503.github.io/RC-KnowHow/\\" value=\\""+(d.settings&&d.settings.knowhowUrl?d.settings.knowhowUrl:"")+"\\"><button onclick=\\"saveKnowHowUrl()\\" class=\\"btn btn-p btn-sm\\">Speichern</button></div></div>"
++
