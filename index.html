@@ -2005,7 +2005,6 @@ function aToggle(i,v){smpDB().auf[i].done=v;saveDB();nav('auf');}
 function patToggle(pi,ai,v){if(APP.data.projects[pi]&&APP.data.projects[pi].auf&&APP.data.projects[pi].auf[ai]){APP.data.projects[pi].auf[ai].done=v;saveData();nav('auf');}}
 function wDel(i){var kw=getKW(PW2,PY);if(kw.tage[PD])(kw.tage[PD]).splice(i,1);saveKW(kw);nav('woche');}
 function aDel(i){smpDB().auf.splice(i,1);saveDB();nav('auf');}
-function iDel(i){smpDB().id.splice(i,1);saveDB();nav('id');}
 function padDel(pi,ai){if(APP.data.projects[pi]&&APP.data.projects[pi].auf)APP.data.projects[pi].auf.splice(ai,1);saveData();nav('auf');}
 function wNotizTA(ta){var kw=getKW(PW2,PY);if(!kw.notizen)kw.notizen={};kw.notizen[PD]=ta.value;saveKW(kw);}
 function pNotizTA(ta){var pi=parseInt(ta.getAttribute('data-pi'));if(APP.data.projects[pi])APP.data.projects[pi].notiz2=ta.value;saveData();}
@@ -2420,15 +2419,255 @@ kw.notizen[PD]=ta.value;saveKW(kw);
 }
 function aAdd(){ var i=document.getElementById('ai'),p=document.getElementById('ap'); if(!i||!i.value.trim())return; DB.auf.push({id:uid(),text:i.value.trim(),done:false,prioritaet:p?p.value:''}); saveDB();i.value='';nav('auf'); }
 function pNotiz(ta,pi){ DB.proj[pi].notiz=ta.value;saveDB(); }
-function rId(){
-var rows='';
-for(var i=0;i<DB.id.length;i++) rows+='<div class="ri">'+'<span style="font-size:12px;flex-shrink:0">💡</span>'+'<span class="rt">'+esc(DB.id[i].text)+'</span>'+'<button class="xb" onclick="iDel('+i+')">&#215;</button>'+'</div>';
-return '<div style="max-width:540px"><div class="card"><div class="sh"><span class="ic">💡</span>Ideen & Notizen<span class="bdg" style="background:#FBBF2418;color:#FBBF24;border-color:#FBBF2430">'+DB.id.length+'</span></div>'
-+'<div class="ir"><input class="inp" id="ii" placeholder="Neue Idee oder Notiz…"/>'
-+'<button class="ab" style="background:#FBBF2418;color:#FBBF24;border-color:#FBBF2430" onclick="iAdd()">+ Festhalten</button></div>'
-+(DB.id.length===0?'<p style="color:#64748B;font-size:12px;text-align:center;padding:12px">Noch keine Ideen</p>':rows)
-+'</div></div>';
+
+// ── IDEEN KARTEN SYSTEM ──────────────────────────────────────────
+var ID_DETAIL = null; // currently open card id
+
+function idDB(){
+  smpDB();
+  // Migrate old flat items to card format
+  for(var i=0;i<APP.smp.id.length;i++){
+    var item=APP.smp.id[i];
+    if(!item.titel&&item.text){
+      item.titel=item.text;
+      item.id=item.id||("idk"+i);
+      item.farbe="#f59e0b";
+      item.notiz="";
+      item.punkte=[];
+      item.erstellt=new Date().toISOString().slice(0,10);
+      delete item.text;
+    }
+  }
+  return APP.smp.id;
 }
+
+function idSave(){saveDB();}
+
+function idNeu(){
+  var titel=prompt("Titel der Idee / Karte:");
+  if(!titel||!titel.trim())return;
+  var farben=["#f59e0b","#c41230","#0891b2","#059669","#7c3aed","#db2777"];
+  var karte={
+    id:"idk"+Date.now(),
+    titel:titel.trim(),
+    farbe:farben[Math.floor(Math.random()*farben.length)],
+    notiz:"",
+    punkte:[],
+    erstellt:new Date().toISOString().slice(0,10)
+  };
+  idDB().push(karte);
+  idSave();
+  ID_DETAIL=karte.id;
+  renderSMPPage("id");
+}
+
+function idDel(id){
+  if(!confirm("Karte löschen?"))return;
+  var ids=idDB();
+  var idx2=-1;
+  for(var i=0;i<ids.length;i++)if(ids[i].id===id){idx2=i;break;}
+  if(idx2>=0) ids.splice(idx2,1);
+  if(ID_DETAIL===id) ID_DETAIL=null;
+  idSave();renderSMPPage("id");
+}
+
+function idOpenDetail(id){ID_DETAIL=id;renderSMPPage("id");}
+function idCloseDetail(){ID_DETAIL=null;renderSMPPage("id");}
+
+function idEditTitel(id){
+  var ids=idDB(),k=null;
+  for(var i=0;i<ids.length;i++)if(ids[i].id===id){k=ids[i];break;}
+  if(!k)return;
+  var t=prompt("Titel:",k.titel||"");
+  if(t===null)return;
+  k.titel=t.trim();idSave();renderSMPPage("id");
+}
+
+function idEditNotiz(id){
+  var el=document.getElementById("id-notiz-"+id);
+  if(!el)return;
+  var ids=idDB();
+  for(var i=0;i<ids.length;i++)if(ids[i].id===id){ids[i].notiz=el.value;break;}
+  idSave();
+}
+
+function idSetFarbe(id,farbe){
+  var ids=idDB();
+  for(var i=0;i<ids.length;i++)if(ids[i].id===id){ids[i].farbe=farbe;break;}
+  idSave();renderSMPPage("id");
+}
+
+function idAddPunkt(id){
+  var inp=document.getElementById("id-inp-"+id);
+  if(!inp||!inp.value.trim())return;
+  var ids=idDB();
+  for(var i=0;i<ids.length;i++){
+    if(ids[i].id===id){
+      if(!ids[i].punkte)ids[i].punkte=[];
+      ids[i].punkte.push({id:"p"+Date.now(),text:inp.value.trim(),done:false});
+      break;
+    }
+  }
+  idSave();inp.value="";renderSMPPage("id");
+}
+
+function idTogglePunkt(kid,pid,done){
+  var ids=idDB();
+  for(var i=0;i<ids.length;i++){
+    if(ids[i].id===kid){
+      for(var j=0;j<(ids[i].punkte||[]).length;j++){
+        if(ids[i].punkte[j].id===pid){ids[i].punkte[j].done=done;break;}
+      }
+      break;
+    }
+  }
+  idSave();
+}
+
+function idDelPunkt(kid,pid){
+  var ids=idDB();
+  for(var i=0;i<ids.length;i++){
+    if(ids[i].id===kid){
+      ids[i].punkte=(ids[i].punkte||[]).filter(function(p){return p.id!==pid;});
+      break;
+    }
+  }
+  idSave();renderSMPPage("id");
+}
+
+function idEditPunkt(kid,pid){
+  var ids=idDB(),p=null;
+  for(var i=0;i<ids.length;i++){
+    if(ids[i].id===kid){
+      for(var j=0;j<(ids[i].punkte||[]).length;j++){
+        if(ids[i].punkte[j].id===pid){p=ids[i].punkte[j];break;}
+      }
+      break;
+    }
+  }
+  if(!p)return;
+  var t=prompt("Unterpunkt bearbeiten:",p.text||"");
+  if(t===null)return;
+  p.text=t.trim();idSave();renderSMPPage("id");
+}
+
+function rId(){
+  var ids=idDB();
+  var FARBEN=["#f59e0b","#c41230","#0891b2","#059669","#7c3aed","#db2777"];
+
+  // ── DETAIL MODAL ─────────────────────────────────────────────
+  var modal="";
+  if(ID_DETAIL){
+    var k=null;
+    for(var i=0;i<ids.length;i++)if(ids[i].id===ID_DETAIL){k=ids[i];break;}
+    if(k){
+      var punkte=k.punkte||[];
+      var done=punkte.filter(function(p){return p.done;}).length;
+      var pRows=punkte.map(function(p){
+        return "<div style=\"display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)\">"
+          +"<input type=\"checkbox\""+(p.done?" checked":"")+" onchange=\"idTogglePunkt(&apos;"+k.id+"&apos;,&apos;"+p.id+"&apos;,this.checked)\" style=\"accent-color:"+k.farbe+";flex-shrink:0;width:16px;height:16px\">"
+          +"<span style=\"flex:1;font-size:13px;"+(p.done?"text-decoration:line-through;color:var(--text3)":"")+"\" onclick=\"idEditPunkt(&apos;"+k.id+"&apos;,&apos;"+p.id+"&apos;)\">"+esc(p.text)+"</span>"
+          +"<button onclick=\"idEditPunkt(&apos;"+k.id+"&apos;,&apos;"+p.id+"&apos;)\" style=\"background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;opacity:.5\">&#9998;</button>"
+          +"<button onclick=\"idDelPunkt(&apos;"+k.id+"&apos;,&apos;"+p.id+"&apos;)\" style=\"background:none;border:none;color:var(--text3);cursor:pointer;opacity:.4\">&#10005;</button>"
+          +"</div>";
+      }).join("");
+
+      var farbPicker=FARBEN.map(function(f){
+        return "<div onclick=\"idSetFarbe(&apos;"+k.id+"&apos;,&apos;"+f+"&apos;)\" style=\"width:22px;height:22px;background:"+f+";border-radius:50%;cursor:pointer;border:3px solid "+(k.farbe===f?"#fff":"transparent")+";box-shadow:"+(k.farbe===f?"0 0 0 2px "+f:"none")+"\"></div>";
+      }).join("");
+
+      modal="<div style=\"position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px\" onclick=\"idCloseDetail()\">"
+        +"<div style=\"background:var(--card);width:100%;max-width:600px;max-height:88vh;overflow-y:auto;border-top:4px solid "+k.farbe+"\" onclick=\"event.stopPropagation()\">"
+        // Header
+        +"<div style=\"padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px\">"
+        +"<div style=\"flex:1\">"
+        +"<div style=\"font-size:18px;font-weight:700;cursor:pointer\" onclick=\"idEditTitel(&apos;"+k.id+"&apos;)\">"+esc(k.titel)+" <span style=\"font-size:12px;color:var(--text3)\">&#9998;</span></div>"
+        +"<div style=\"font-size:10px;color:var(--text3);margin-top:2px\">"+esc(k.erstellt||"")+" &middot; "+punkte.length+" Punkte &middot; "+done+" erledigt</div>"
+        +"</div>"
+        +"<button onclick=\"idCloseDetail()\" style=\"background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1\">&#10005;</button>"
+        +"</div>"
+        // Farbe
+        +"<div style=\"padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px\">"
+        +"<span style=\"font-size:11px;color:var(--text3)\">Farbe:</span>"
+        +farbPicker
+        +"</div>"
+        // Notiz
+        +"<div style=\"padding:14px 18px;border-bottom:1px solid var(--border)\">"
+        +"<div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:7px\">Notiz</div>"
+        +"<textarea id=\"id-notiz-"+k.id+"\" onchange=\"idEditNotiz(&apos;"+k.id+"&apos;)\" class=\"fi\" placeholder=\"Beschreibung, Kontext, Links…\" style=\"min-height:80px;resize:vertical;width:100%\">"+esc(k.notiz||"")+"</textarea>"
+        +"</div>"
+        // Unterpunkte
+        +"<div style=\"padding:14px 18px\">"
+        +"<div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px\">Unterpunkte"+(punkte.length>0?" <span style=\"color:"+k.farbe+"\">"+done+"/"+punkte.length+"</span>":"")+"</div>"
+        +(pRows||"<div style=\"font-size:12px;color:var(--text3);padding:8px 0\">Noch keine Unterpunkte</div>")
+        +"<div style=\"display:flex;gap:6px;margin-top:10px\">"
+        +"<input id=\"id-inp-"+k.id+"\" class=\"fi\" placeholder=\"Neuer Unterpunkt…\" style=\"flex:1\" onkeydown=\"if(event.key===&apos;Enter&apos;)idAddPunkt(&apos;"+k.id+"&apos;)\">"
+        +"<button onclick=\"idAddPunkt(&apos;"+k.id+"&apos;)\" style=\"background:"+k.farbe+";color:#fff;border:none;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer\">+</button>"
+        +"</div>"
+        +"</div>"
+        // Footer
+        +"<div style=\"padding:10px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end\">"
+        +"<button onclick=\"idDel(&apos;"+k.id+"&apos;)\" style=\"background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;opacity:.5\">&#128465; Karte löschen</button>"
+        +"</div>"
+        +"</div></div>";
+    }
+  }
+
+  // ── KARTEN GRID ──────────────────────────────────────────────
+  var grid="";
+  if(ids.length===0){
+    grid="<div style=\"text-align:center;padding:48px;color:var(--text3);background:var(--bg)\">"
+      +"<div style=\"font-size:36px;margin-bottom:10px\">&#128161;</div>"
+      +"Noch keine Ideen<br><small>Erstelle deine erste Karte</small>"
+      +"</div>";
+  } else {
+    grid="<div style=\"display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px\">";
+    for(var i=0;i<ids.length;i++){
+      var k=ids[i];
+      var punkte=k.punkte||[];
+      var done=punkte.filter(function(p){return p.done;}).length;
+      var offen=punkte.length-done;
+      var pct=punkte.length>0?Math.round(done/punkte.length*100):0;
+      // Preview: first 3 punkte
+      var preview="";
+      for(var j=0;j<Math.min(punkte.length,3);j++){
+        var p=punkte[j];
+        preview+="<div style=\"display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;"+(p.done?"color:var(--text3);text-decoration:line-through":"color:var(--text)\">"
+          )+"<span style=\"color:"+(p.done?"var(--text3)":k.farbe)+";font-size:10px\">"+(p.done?"✓":"•")+"</span>"+esc(p.text)+"</div>";
+      }
+      if(punkte.length>3) preview+="<div style=\"font-size:10px;color:var(--text3);margin-top:2px\">"+(punkte.length-3)+" weitere…</div>";
+
+      grid+="<div onclick=\"idOpenDetail(&apos;"+k.id+"&apos;)\" style=\"background:var(--card);border:1px solid var(--border);border-top:4px solid "+k.farbe+";padding:14px;cursor:pointer;transition:box-shadow .15s\" onmouseover=\"this.style.boxShadow=&apos;0 4px 16px rgba(0,0,0,.12)&apos;\" onmouseout=\"this.style.boxShadow=&apos;none&apos;\">"
+        // Title
+        +"<div style=\"font-weight:700;font-size:14px;margin-bottom:4px;line-height:1.3\">"+esc(k.titel)+"</div>"
+        +"<div style=\"font-size:10px;color:var(--text3);margin-bottom:10px\">"+esc(k.erstellt||"")+"</div>"
+        // Progress bar (if has punkte)
+        +(punkte.length>0
+          ?"<div style=\"background:var(--bg3);height:3px;margin-bottom:6px\"><div style=\"height:100%;background:"+k.farbe+";width:"+pct+"%\"></div></div>"
+          +"<div style=\"font-size:10px;color:var(--text3);margin-bottom:8px\">"+done+"/"+punkte.length+" erledigt</div>"
+          :"<div style=\"font-size:11px;color:var(--text3);margin-bottom:8px\">Keine Unterpunkte</div>")
+        // Preview punkte
+        +(preview?"<div style=\"border-top:1px solid var(--border);padding-top:8px\">"+preview+"</div>":"")
+        +"</div>";
+    }
+    grid+="</div>";
+  }
+
+  return "<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:16px\">"
+    +"<div><div class=\"pt\" style=\"margin-bottom:2px\">&#128161; Ideen &amp; Notizen</div>"
+    +"<div style=\"font-size:11px;color:var(--text3)\">"+ids.length+" Karten</div></div>"
+    +"<button onclick=\"idNeu()\" style=\"background:var(--red);color:#fff;border:none;padding:8px 18px;font-size:12px;font-weight:600;cursor:pointer\">+ Neue Karte</button>"
+    +"</div>"
+    +grid
+    +modal;
+}
+
+function iDel(i){
+  // Legacy flat delete
+  var ids=idDB();
+  if(ids[i]) idDel(ids[i].id);
+}
+
 function iAdd(){ var i=document.getElementById('ii'); if(!i||!i.value.trim())return; DB.id.push({id:uid(),text:i.value.trim()}); saveDB();i.value='';nav('id'); }
 function openImport(){
 var m=document.createElement('div');m.className='ov';
