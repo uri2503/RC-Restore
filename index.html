@@ -448,7 +448,7 @@ function plb(s){var m={Geplant:"b-gray","In Arbeit":"b-blue",Fertig:"b-green",Pr
 function psb(s){var x={l:s,c:"ps0"};for(var i=0;i<PST.length;i++)if(PST[i].v===s){x=PST[i];break;}return badge(x.c,x.i+" "+x.l);}
 function dot(s){var c={Fertig:"var(--green2)","In Arbeit":"#cc9200",Geplant:"var(--text3)",Problem:"var(--red)"}[s]||"var(--text3)";return "<span style=\"width:7px;height:7px;border-radius:50%;background:"+c+";display:inline-block;flex-shrink:0\"></span>";}
 function nav(view,pid){
-var _smpP={'woche':1,'auf':1,'id':1,'zeitliste':1,'zeitrep':1,'stamm':1,'backup':1};
+var _smpP={'woche':1,'auf':1,'id':1,'rcdev':1,'zeit':1,'zeitliste':1,'zeitrep':1,'teilesuche':1,'kalkulation':1,'dokumente':1,'stamm':1,'backup':1};
 if(_smpP[view]){
 APP.view=view;
 var _ni=document.querySelectorAll('.ni');
@@ -3593,11 +3593,15 @@ try{
 if(v==='woche') mc.innerHTML='<div class="page">'+rWoche()+'</div>';
 else if(v==='auf') mc.innerHTML='<div class="page">'+rAuf()+'</div>';
 else if(v==='id') mc.innerHTML='<div class="page">'+rId()+'</div>';
-else if(v==='zeitliste') mc.innerHTML='<div class="page">'+rZeit()+'</div>';
+else if(v==='zeitliste'||v==='zeit') mc.innerHTML='<div class="page">'+rZeit()+'</div>';
 else if(v==='zeitrep') mc.innerHTML='<div class="page">'+rBericht()+'</div>';
 else if(v==='stamm') mc.innerHTML='<div class="page">'+rStamm()+'</div>';
 else if(v==='backup') mc.innerHTML='<div class="page">'+rBackup()+'</div>';
-if(v==='zeitliste') setTimeout(checkStampTimer,100);
+else if(v==='rcdev') mc.innerHTML='<div class="page">'+rRCDev()+'</div>';
+else if(v==='teilesuche') mc.innerHTML='<div class="page">'+rTeilesuche()+'</div>';
+else if(v==='kalkulation') mc.innerHTML='<div class="page">'+rKalkulation()+'</div>';
+else if(v==='dokumente') mc.innerHTML='<div class="page">'+rDokumente()+'</div>';
+if(v==='zeitliste'||v==='zeit') setTimeout(checkStampTimer,100);
 setTimeout(bindSMPEvents,50);
 }catch(ex){mc.innerHTML='<div class="page"><div style="background:#fde8ec;padding:16px;border-radius:6px;color:#c41230"><b>Fehler:</b> '+ex.message+'</div></div>';}
 }
