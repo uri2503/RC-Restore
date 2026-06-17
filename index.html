@@ -1034,6 +1034,8 @@ return pH("d")+"<div class=\"flex fac fjb mb3\"><span class=\"tsm cm\">"+p.demon
 }
 function vPT(){
 var p=curP(),teile=p.teile.slice(),totK=0;
+  // Recherche widget at top
+  var rechHTML=rProjTeileRecherche(p.name);
 if(APP.pf)teile=teile.filter(function(t){return t.status===APP.pf;});
 if(APP.ps){var q=APP.ps.toLowerCase();teile=teile.filter(function(t){return(t.name+t.nr+t.gr+t.lief).toLowerCase().indexOf(q)>=0;});}
 for(var i=0;i<teile.length;i++)totK+=teile[i].kosten||0;
@@ -1049,7 +1051,16 @@ rows+="<tr><td><div class=\"tsm fw\">"+t.name+"</div><div class=\"txs cm\">"+t.n
 }
 var fb="<span class=\"badge b-gray\" style=\"cursor:pointer;"+(!APP.pf?"background:var(--red);color:#fff;border-color:var(--red)":"")+"\" data-action=\"fParts\" data-id=\"\">Alle</span> ";
 for(var i=0;i<PST.length;i++){var ps=PST[i];fb+="<span class=\"badge "+ps.c+"\" style=\"cursor:pointer;"+(APP.pf===ps.v?"box-shadow:0 0 0 2px var(--red)":"")+"\" data-action=\"fParts\" data-id=\""+ps.v+"\">"+ps.i+" "+ps.l+"</span> ";}
-return pH("t")+"<div class=\"flex fac fjb mb3\" style=\"flex-wrap:wrap;gap:8px\">"
+// Recherche accordion
+  var recCount=(agDB().teileRecherche||[]).filter(function(r){return r.proj===p.name;}).length;
+  var rechSection='<div class="card" style="margin-bottom:12px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="var n=this.nextElementSibling;n.style.display=n.style.display===\'none\'?\'block\':\'none\'">'
+    +'<span style="font-size:11px;font-weight:700;color:var(--teal)">&#128269; Teile-Recherche ('+recCount+' Suchen)</span>'
+    +'<span style="font-size:11px;color:var(--text3)">&#9660;</span>'
+    +'</div>'
+    +'<div style="display:none;margin-top:10px">'+rProjTeileRecherche(p.name)+'</div>'
+    +'</div>';
+  return rechSection+pH("t")+"<div class=\"flex fac fjb mb3\" style=\"flex-wrap:wrap;gap:8px\">"
 +"<input id=\"PSRCH\" class=\"fi\" style=\"width:200px\" placeholder=\"Suche...\" value=\""+APP.ps+"\">"
 +"<div class=\"flex g2p fac\"><span class=\"txs cm\">"+teile.length+" Teile &bull; "+FMT(totK)+"</span>"
 +"<button class=\"btn btn-p\" data-action=\"openTM\">+ Ersatzteil</button></div></div>"
@@ -3703,7 +3714,7 @@ if(mc)mc.innerHTML="<div style=\"padding:20px;background:#fde8ec;border-radius:8
 
 
 // ── AG MODULE ────────────────────────────────────────────────────
-function agDB(){smpDB();if(!APP.smp.ag)APP.smp.ag={teileHistory:[],firma:{name:"Riedel classics",str:"",ort:"",tel:"",mail:"",mwst:false,mwstSatz:19},ss:[{name:"Mechanik",preis:109},{name:"Lackierung",preis:149},{name:"Karosserie",preis:109},{name:"Polsterer",preis:95}],kalk:{arbeit:[],material:[]},savedKalks:[]};return APP.smp.ag;}
+function agDB(){smpDB();if(!APP.smp.ag)APP.smp.ag={teileHistory:[],teileRecherche:[],firma:{name:"Riedel classics",str:"",ort:"",tel:"",mail:"",mwst:false,mwstSatz:19},ss:[{name:"Mechanik",preis:109},{name:"Lackierung",preis:149},{name:"Karosserie",preis:109},{name:"Polsterer",preis:95}],kalk:{arbeit:[],material:[]},savedKalks:[]};if(!APP.smp.ag.teileRecherche)APP.smp.ag.teileRecherche=[];return APP.smp.ag;}
 function agSave(){saveDB();}
 function agFmt(n){return Number(n||0).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function agNum(s){return parseFloat(String(s||0).replace(",","."))||0;}
@@ -3717,9 +3728,16 @@ function agKiAnalyse(nr){
 
 function agStartTeilesuche(){
   var nr=(document.getElementById("ag-t-nr")||{}).value||"";
+  var proj=(document.getElementById("ag-t-proj")||{}).value||"";
   nr=nr.trim(); if(!nr){alert("Bitte Teilenummer eingeben");return;}
   var db=agDB();
-  if(db.teileHistory.indexOf(nr)<0){db.teileHistory.unshift(nr);if(db.teileHistory.length>10)db.teileHistory.pop();agSave();}
+  // Save to history
+  if(db.teileHistory.indexOf(nr)<0){db.teileHistory.unshift(nr);if(db.teileHistory.length>20)db.teileHistory.pop();}
+  // Save to Recherche with project link
+  var rec={id:"tr"+Date.now(),nr:nr,proj:proj,datum:new Date().toISOString().slice(0,10),urls:[],notiz:""};
+  db.teileRecherche.unshift(rec);
+  if(db.teileRecherche.length>200) db.teileRecherche.pop();
+  agSave();
   var info=agKiAnalyse(nr);
   var links=[
     {n:"Mercedes-Benz",u:"https://mercedes-benz-classic-parts.com/search?q="+encodeURIComponent(nr),c:"var(--red)"},
@@ -3731,13 +3749,49 @@ function agStartTeilesuche(){
   var h="";
   for(var i=0;i<info.length;i++) h+="<div style=\"font-size:12px;padding:2px 0\">&#8250; "+esc(info[i])+"</div>";
   var lh="";
-  for(var i=0;i<links.length;i++) lh+="<a href=\""+links[i].u+"\" target=\"_blank\" style=\"padding:6px 12px;background:var(--bg);border:1px solid var(--border);font-size:11px;font-weight:600;color:"+links[i].c+";text-decoration:none\">&#8599; "+links[i].n+"</a> ";
+  for(var i=0;i<links.length;i++){
+    var l=links[i];
+    lh+="<a href=\""+l.u+"\" target=\"_blank\" onclick=\"agSaveUrl(&apos;"+rec.id+"&apos;,&apos;"+l.n+"&apos;,&apos;"+l.u+"&apos;)\" style=\"padding:6px 12px;background:var(--bg);border:1px solid var(--border);font-size:11px;font-weight:600;color:"+l.c+";text-decoration:none;display:inline-block\">&#8599; "+l.n+"</a> ";
+  }
   var resEl=document.getElementById("ag-t-result");
   if(!resEl)return;
-  resEl.innerHTML="<div class=\"card\" style=\"margin-bottom:10px\"><div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px\">KI-Analyse</div>"+h+"</div>"
-    +"<div class=\"card\"><div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px\">Direkt suchen</div>"
+  resEl.innerHTML="<div class=\"card\" style=\"margin-bottom:10px\"><div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px\">KI-Analyse: "+esc(nr)+"</div>"+h
+    +(proj?"<div style=\"margin-top:6px;font-size:11px;color:var(--teal)\">&#128193; Projekt: <b>"+esc(proj)+"</b></div>":"")
+    +"</div>"
+    +"<div class=\"card\"><div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px\">Direkt suchen <span style=\"font-weight:400;color:var(--text3)\">(geklickte Links werden gespeichert)</span></div>"
     +"<div style=\"display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px\">"+lh+"</div>"
-    +"<button onclick=\"agAddToKalk('"+nr.replace(/'/g,"&apos;")+"')\" style=\"background:var(--teal);color:#fff;border:none;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer\">+ Zur Kalkulation hinzuf&uuml;gen</button></div>";
+    +"<div style=\"margin-top:8px;display:flex;gap:6px\">"
+    +"<button onclick=\"agAddToKalk(&apos;"+nr+"&apos;)\" style=\"background:var(--teal);color:#fff;border:none;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer\">+ Zur Kalkulation</button>"
+    +"<button onclick=\"agAddToDok(&apos;"+nr+"&apos;)\" style=\"background:var(--amber);color:#fff;border:none;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer\">+ Zum Angebot</button>"
+    +"</div></div>"
+    +"<div style=\"background:#e0f7fa;border:1px solid rgba(8,145,178,.2);padding:8px 12px;margin-top:8px;font-size:11px\">"
+    +"<b style=\"color:var(--teal)\">&#128190; Suche gespeichert</b>"+(proj?" unter Projekt <b>"+esc(proj)+"</b>":"")+". <a onclick=\"renderSMPPage(&apos;teilesuche&apos;)\" style=\"color:var(--teal);cursor:pointer\">Recherche-Historie anzeigen &#8594;</a>"
+    +"</div>";
+}
+
+function agSaveUrl(recId, name, url){
+  var db=agDB();
+  for(var i=0;i<db.teileRecherche.length;i++){
+    if(db.teileRecherche[i].id===recId){
+      if(!db.teileRecherche[i].urls) db.teileRecherche[i].urls=[];
+      // avoid duplicate
+      for(var j=0;j<db.teileRecherche[i].urls.length;j++) if(db.teileRecherche[i].urls[j].name===name) return;
+      db.teileRecherche[i].urls.push({name:name,url:url,ts:new Date().toISOString()});
+      agSave();
+      return;
+    }
+  }
+}
+
+function agAddToDok(nr){
+  // Navigate to Angebote and pre-fill material
+  var db=docsDB();
+  if(!DOK_NEW) dokNeuWizard();
+  if(DOK_NEW){
+    DOK_NEW.positionen.push({typ:"material",nr:nr,bez:"",ek:0,auf:30,menge:1});
+    renderSMPPage("dokumente");
+    setTimeout(function(){_refreshDok();},100);
+  }
 }
 
 function agAddToKalk(nr){var db=agDB();db.kalk.material.push({id:Date.now(),nr:nr,bez:"",ek:0,auf:30,menge:1});agSave();renderSMPPage("kalkulation");}
@@ -3784,19 +3838,117 @@ function agPrintAngebot(){
 }
 
 function rTeilesuche(){
-  var db=agDB(),hist=db.teileHistory||[];
+  var db=agDB();
+  var hist=db.teileHistory||[];
+  var recherche=db.teileRecherche||[];
+
+  // History chips
   var hh="";
-  for(var i=0;i<hist.length;i++) hh+="<span onclick=\"var el=document.getElementById(&apos;ag-t-nr&apos;);if(el)el.value=this.textContent\" style=\"padding:3px 10px;background:var(--bg);border:1px solid var(--border);font-size:11px;cursor:pointer;font-family:monospace\">"+esc(hist[i])+"</span> ";
-  var r="<div class=\"pt\" style=\"margin-bottom:4px\">&#128269; Teilesuche</div>";
-  r+="<div style=\"font-size:11px;color:var(--text3);margin-bottom:16px\">Teilenummern analysieren &amp; bei Anbietern suchen</div>";
-  r+="<div class=\"card\" style=\"margin-bottom:14px\">";
-  r+="<div style=\"display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end\">";
-  r+="<div><label class=\"fl\">Teilenummer</label><input id=\"ag-t-nr\" class=\"fi\" placeholder=\"z.B. A0012953506\" style=\"font-size:14px;font-weight:600\"></div>";
-  r+="<button onclick=\"agStartTeilesuche()\" style=\"background:var(--red);color:#fff;border:none;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer\">Suchen</button>";
-  r+="</div>";
-  if(hh) r+="<div style=\"margin-top:10px\"><div style=\"font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:5px\">Letzte Suchen</div><div style=\"display:flex;flex-wrap:wrap;gap:4px\">"+hh+"</div></div>";
-  r+="</div><div id=\"ag-t-result\"></div>";
-  return r;
+  for(var i=0;i<Math.min(hist.length,10);i++){
+    hh+="<span onclick=\"var el=document.getElementById(&apos;ag-t-nr&apos;);if(el)el.value=this.textContent\" style=\"padding:3px 10px;background:var(--bg);border:1px solid var(--border);font-size:11px;cursor:pointer;font-family:monospace\">"+esc(hist[i])+"</span> ";
+  }
+
+  // Project options
+  var projOpts="<option value=\"\">-- Kein Projekt --</option>";
+  for(var i=0;i<APP.data.projects.length;i++){
+    projOpts+="<option value=\""+esc(APP.data.projects[i].name)+"\">"+esc(APP.data.projects[i].name)+"</option>";
+  }
+
+  // Recherche history grouped by project
+  var recHTML="";
+  if(recherche.length>0){
+    // Group by project
+    var groups={};var order=[];
+    for(var i=0;i<recherche.length;i++){
+      var r=recherche[i];
+      var g=r.proj||"(kein Projekt)";
+      if(!groups[g]){groups[g]=[];order.push(g);}
+      groups[g].push(r);
+    }
+    recHTML="<div class=\"card\" style=\"margin-top:16px\">";
+    recHTML+="<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:12px\">";
+    recHTML+="<div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3)\">Recherche-Historie ("+recherche.length+")</div>";
+    recHTML+="<button onclick=\"agClearRecherche()\" style=\"background:none;border:none;font-size:10px;color:var(--text3);cursor:pointer;opacity:.5\">Alle l&ouml;schen</button>";
+    recHTML+="</div>";
+    for(var gi=0;gi<order.length;gi++){
+      var g=order[gi],grp=groups[g];
+      recHTML+="<div style=\"margin-bottom:14px\">";
+      recHTML+="<div style=\"font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--teal);padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:6px\">&#128193; "+esc(g)+"</div>";
+      for(var ri=0;ri<grp.length;ri++){
+        var r=grp[ri];
+        var urlH="";
+        for(var ui=0;ui<(r.urls||[]).length;ui++){
+          urlH+="<a href=\""+esc(r.urls[ui].url)+"\" target=\"_blank\" style=\"font-size:10px;color:var(--teal);text-decoration:none;margin-right:8px\">&#8599; "+esc(r.urls[ui].name)+"</a>";
+        }
+        recHTML+="<div style=\"display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid var(--bg)\">";
+        recHTML+="<span style=\"font-family:monospace;font-size:12px;font-weight:700;color:var(--text);min-width:120px\">"+esc(r.nr)+"</span>";
+        recHTML+="<div style=\"flex:1\">";
+        recHTML+=(urlH?"<div style=\"margin-bottom:2px\">"+urlH+"</div>":"<span style=\"font-size:10px;color:var(--text3)\">keine URL geklickt</span>");
+        recHTML+="<div style=\"font-size:10px;color:var(--text3)\">"+esc(r.datum||"")+"</div>";
+        recHTML+="</div>";
+        recHTML+="<button onclick=\"var el=document.getElementById(&apos;ag-t-nr&apos;);if(el){el.value=&apos;"+esc(r.nr)+"&apos;;agStartTeilesuche();}\" style=\"background:var(--bg);border:1px solid var(--border);padding:3px 8px;font-size:10px;cursor:pointer;flex-shrink:0\">&#128269;</button>";
+        recHTML+="<button onclick=\"agDelRecherche(&apos;"+r.id+"&apos;)\" style=\"background:none;border:none;color:var(--text3);cursor:pointer;opacity:.4;flex-shrink:0\">&#10005;</button>";
+        recHTML+="</div>";
+      }
+      recHTML+="</div>";
+    }
+    recHTML+="</div>";
+  }
+
+  var r2="<div class=\"pt\" style=\"margin-bottom:4px\">&#128269; Teilesuche</div>";
+  r2+="<div style=\"font-size:11px;color:var(--text3);margin-bottom:16px\">Teilenummern analysieren, URLs speichern &amp; Projekt zuordnen</div>";
+  r2+="<div class=\"card\" style=\"margin-bottom:14px\">";
+  r2+="<div style=\"display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end\">";
+  r2+="<div><label class=\"fl\">Teilenummer</label><input id=\"ag-t-nr\" class=\"fi\" placeholder=\"z.B. A0012953506\" style=\"font-size:14px;font-weight:600\"></div>";
+  r2+="<div><label class=\"fl\">Projekt zuordnen</label><select id=\"ag-t-proj\" class=\"fsel\" style=\"width:100%\">"+projOpts+"</select></div>";
+  r2+="<button onclick=\"agStartTeilesuche()\" style=\"background:var(--red);color:#fff;border:none;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;height:36px;align-self:end\">Suchen</button>";
+  r2+="</div>";
+  if(hh) r2+="<div style=\"margin-top:10px\"><div style=\"font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:5px\">Letzte Suchen</div><div style=\"display:flex;flex-wrap:wrap;gap:4px\">"+hh+"</div></div>";
+  r2+="</div>";
+  r2+="<div id=\"ag-t-result\"></div>";
+  r2+=recHTML;
+  return r2;
+}
+
+
+function rProjTeileRecherche(projName){
+  // Show teile recherche for a specific project
+  var db=agDB();
+  var recs=(db.teileRecherche||[]).filter(function(r){return r.proj===projName;});
+  if(recs.length===0) return "<div style=\"text-align:center;padding:24px;color:var(--text3);background:var(--bg);font-size:12px\">Noch keine Teilesuchen f\u00fcr dieses Projekt.<br><button onclick=\"nav(&apos;teilesuche&apos;)\" style=\"margin-top:10px;background:var(--red);color:#fff;border:none;padding:6px 14px;font-size:11px;cursor:pointer\">&#128269; Zur Teilesuche</button></div>";
+  var html="<div style=\"margin-bottom:10px;display:flex;justify-content:space-between;align-items:center\">";
+  html+="<div style=\"font-size:12px;color:var(--text3)\">"+recs.length+" Suchanfragen gespeichert</div>";
+  html+="<button onclick=\"nav(&apos;teilesuche&apos;)\" style=\"background:var(--red);color:#fff;border:none;padding:5px 12px;font-size:11px;cursor:pointer\">+ Neue Suche</button>";
+  html+="</div>";
+  for(var i=0;i<recs.length;i++){
+    var r=recs[i];
+    var urlH="";
+    for(var j=0;j<(r.urls||[]).length;j++){
+      urlH+="<a href=\""+esc(r.urls[j].url)+"\" target=\"_blank\" style=\"font-size:11px;color:var(--teal);text-decoration:none;font-weight:600;margin-right:8px\">&#8599; "+esc(r.urls[j].name)+"</a>";
+    }
+    html+="<div style=\"background:var(--card);border:1px solid var(--border);border-left:3px solid var(--teal);padding:10px 12px;margin-bottom:6px\">";
+    html+="<div style=\"display:flex;align-items:center;gap:10px\">";
+    html+="<span style=\"font-family:monospace;font-size:13px;font-weight:700;color:var(--text)\">"+esc(r.nr)+"</span>";
+    html+="<span style=\"font-size:10px;color:var(--text3)\">"+esc(r.datum||"")+"</span>";
+    html+="<div style=\"margin-left:auto;display:flex;gap:6px\">";
+    html+="<button onclick=\"document.getElementById(&apos;ag-t-nr&apos;)&&(document.getElementById(&apos;ag-t-nr&apos;).value=&apos;"+esc(r.nr)+"&apos;);nav(&apos;teilesuche&apos;)\" style=\"background:var(--bg);border:1px solid var(--border);padding:3px 8px;font-size:10px;cursor:pointer\">&#128269; Neu suchen</button>";
+    html+="<button onclick=\"agAddToKalk(&apos;"+esc(r.nr)+"&apos;)\" style=\"background:var(--teal);color:#fff;border:none;padding:3px 8px;font-size:10px;cursor:pointer\">+ Kalk.</button>";
+    html+="</div></div>";
+    if(urlH) html+="<div style=\"margin-top:6px\">"+urlH+"</div>";
+    else html+="<div style=\"margin-top:4px;font-size:10px;color:var(--text3)\">Keine URL gespeichert</div>";
+    html+="</div>";
+  }
+  return html;
+}
+
+function agClearRecherche(){
+  if(!confirm("Gesamte Recherche-Historie l\u00f6schen?"))return;
+  var db=agDB();db.teileRecherche=[];agSave();renderSMPPage("teilesuche");
+}
+function agDelRecherche(id){
+  var db=agDB();
+  db.teileRecherche=db.teileRecherche.filter(function(r){return r.id!==id;});
+  agSave();renderSMPPage("teilesuche");
 }
 
 function rKalkulation(){
