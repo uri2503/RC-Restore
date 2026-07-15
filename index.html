@@ -130,6 +130,9 @@ var PST=[
 var PJST=["Aktiv","Planung","Pausiert","Abgeschlossen"];
 var PLST=["Geplant","In Arbeit","Fertig","Problem"];
 var BEREICHE=["Motor","Karosserie","Interieur","Fahrwerk","Elektrik","Getriebe","Auspuff","Achse","K\u00fchlsystem","Sonstiges"];
+var WERKSTATT_TYPEN=[{key:"hebebuehne",label:"Hebeb\u00fchne"},{key:"strahlbuehne",label:"Strahlb\u00fchne"},{key:"lackierbox",label:"Lackierbox"},{key:"vorbereitung",label:"Vorbereitungsplatz"}];
+var WERKSTATT_DEFAULT={hebebuehne:2,strahlbuehne:1,lackierbox:1,vorbereitung:2};
+function getWTCap(d,key){var v=d.settings.werkstattTypen;return(v&&v[key]!=null)?v[key]:WERKSTATT_DEFAULT[key];}
 var APP={view:"dashboard",pid:null,pf:"",ps:"",zFilter:"",zSearch:"",data:{
 vehicles:[
 {id:"v1",marke:"Mercedes-Benz",modell:"300 SL",baujahr:1955,fnr:"198.040.5500012",kz:"MB-SL 300",farbe:"Silber",status:"In Restauration",km:48200,info:"Legend\u00e4rer Fl\u00fcgelt\u00fcrer.",bild:[],untB:[],untA:[],dok:[],smpProj:""},
@@ -507,8 +510,11 @@ feasible=remH<=m.wochenkapazitaet*weeks;
 }
 return{maId:m.id,name:m.name,weeklyCapH:m.wochenkapazitaet||0,remH:remH,weeksToDeadline:weeks,feasible:feasible,unknown:unknown};
 });
-var werkstattPlaetze=d.settings.werkstattPlaetze||0;
-var bays={active:activeProjects.length,capacity:werkstattPlaetze,feasible:werkstattPlaetze>0?activeProjects.length<=werkstattPlaetze:null};
+var bays=WERKSTATT_TYPEN.map(function(wt){
+var capacity=getWTCap(d,wt.key);
+var active=activeProjects.filter(function(p){return p.platzTyp===wt.key;}).length;
+return{key:wt.key,label:wt.label,active:active,capacity:capacity,feasible:capacity>0?active<=capacity:null};
+});
 return{byMA:byMA,bays:bays};
 }
 // Nur sinnvoll für art==='intern': Kapital, das in einem zurückgestellten Eigenprojekt gebunden ist.
@@ -779,7 +785,11 @@ return "<div class=\"flex fac fjb\" style=\"padding:6px 0;border-bottom:1px soli
 +"<span class=\"tsm cm\">"+FMTH(m.remH)+" offen"+(m.unknown?"":" / "+m.weeklyCapH+"h/Wo")+"</span>"
 +stat+"</div>";
 }).join("");
-var bayBadge=cc.bays.capacity>0?badge(cc.bays.feasible?"b-green":"b-red",cc.bays.active+" / "+cc.bays.capacity+" Plätze belegt"):badge("b-gray","Werkstattplätze nicht konfiguriert");
+var bayRows=cc.bays.map(function(b){
+var stat=b.capacity>0?badge(b.feasible?"b-green":"b-red",b.active+" / "+b.capacity+" belegt"):badge("b-gray","nicht konfiguriert");
+return "<div class=\"flex fac fjb\" style=\"padding:4px 0\"><span class=\"tsm\">"+esc(b.label)+"</span>"+stat+"</div>";
+}).join("");
+var wtByKey={};WERKSTATT_TYPEN.forEach(function(wt){wtByKey[wt.key]=wt.label;});
 var cards=activeProjects.map(function(p){
 var v=getV(p.vid);
 var byMA=remHoursByMA(p);
@@ -787,9 +797,10 @@ var maChips=Object.keys(byMA).map(function(mid){return badge("b-blue",(maById[mi
 var rp=remPartsForProject(p);
 var ct=p.art==="intern"?capitalTiedUp(p):null;
 var capBadge=ct?badge("b-amber","Kapital: "+FMT(ct.capital)+" ("+ct.ageDays+" Tage)"):"";
+var platzBadge=p.platzTyp&&wtByKey[p.platzTyp]?badge("b-teal",wtByKey[p.platzTyp]):"";
 return "<div class=\"pc\" data-action=\"navp\" data-id=\"po\" data-id2=\""+p.id+"\" style=\"margin-bottom:10px\">"
 +"<div class=\"flex fac fjb mb2\"><strong>"+esc(p.name)+"</strong>"+pjb(p.status)+"</div>"
-+"<div class=\"txs cm mb2\">"+(v?esc(v.marke+" "+v.modell):"")+" · "+(p.art==="intern"?"Intern":"Kunde")+"</div>"
++"<div class=\"txs cm mb2\">"+(v?esc(v.marke+" "+v.modell):"")+" · "+(p.art==="intern"?"Intern":"Kunde")+(platzBadge?" ":"")+platzBadge+"</div>"
 +"<div class=\"mb2\">"+(maChips||"<span class=\"txs cm\">Keine Mitarbeiter zugeordnet</span>")+"</div>"
 +"<div class=\"flex fac fjb tsm\"><span>Offene Teile: <strong>"+rp.count+"</strong> ("+FMT(rp.cost)+")</span>"
 +"<span class=\"cm\">"+(rp.projectedReadyDate?"ca. "+FMTD(rp.projectedReadyDate):(rp.unknownLead?"Lieferzeit unbekannt":"—"))+"</span></div>"
@@ -799,7 +810,7 @@ return "<div class=\"pc\" data-action=\"navp\" data-id=\"po\" data-id2=\""+p.id+
 return "<div class=\"page\"><div class=\"pt mb3\">&#127981; Fertigungsplanung</div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Mitarbeiter-Auslastung (aktive Projekte)</div>"
 +(capRows||"<p class=\"txs cm\">Keine Mitarbeiter angelegt (siehe Stammdaten).</p>")
-+"<div class=\"divid\"></div><div class=\"flex fac fjb\"><span class=\"tsm\">Werkstattplätze</span>"+bayBadge+"</div>"
++"<div class=\"divid\"></div><div class=\"fw tsm mb2\">Werkstatt-Ressourcen</div>"+bayRows
 +"</div>"
 +"<div class=\"g2\">"+(cards||"<p class=\"cm txs\">Keine aktiven Projekte.</p>")+"</div></div>";
 }
@@ -1652,20 +1663,22 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"fg\"><label class=\"fl\">Wochenkapazität (h)</label><input class=\"fi\" type=\"number\" id=\"ma-kap\" placeholder=\"z.B. 38\" min=\"0\"></div></div>"
 +"<button class=\"btn btn-p btn-sm\" onclick=\"addMACR()\">+ Mitarbeiter</button></div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#127981; Werkstatt-Ressourcen</div>"
-+"<div class=\"txs cm mb2\">Anzahl paralleler Plätze/Bühnen für die Kapazitätsprüfung in der Fertigungsplanung.</div>"
-+"<div class=\"fg\"><label class=\"fl\">Werkstattplätze</label><input type=\"number\" class=\"fi\" id=\"wr-plaetze\" min=\"0\" value=\""+(d.settings.werkstattPlaetze||"")+"\"></div>"
++"<div class=\"txs cm mb2\">Anzahl paralleler Plätze je Bereich für die Kapazitätsprüfung in der Fertigungsplanung.</div>"
++"<div class=\"frow\">"+WERKSTATT_TYPEN.map(function(wt){return "<div class=\"fg\"><label class=\"fl\">"+wt.label+"</label><input type=\"number\" class=\"fi\" id=\"wr-"+wt.key+"\" min=\"0\" value=\""+getWTCap(d,wt.key)+"\"></div>";}).join("")+"</div>"
 +"<button class=\"btn btn-p btn-sm\" onclick=\"saveWR()\">Speichern</button></div>"
 +"<div class=\"card mb3\"><div class=\"flex fac fjb mb2\"><span class=\"fw tsm\">&#128190; Speicher-Verwaltung</span>"
 +"<span id=\"stor-size\" class=\"txs cm\">...</span></div>"
 +"<div class=\"flex g2p\"><button class=\"btn btn-g btn-sm\" onclick=\"checkStorageUsage()\">Prüfen</button>"
 +"<button class=\"btn btn-p btn-sm\" onclick=\"cleanStorage()\">Bereinigen</button>"
 +"<button class=\"btn btn-g btn-sm\" onclick=\"stripVehiclePhotos()\">Fotos löschen</button></div></div>"
-+"<div class=\"card\"><div class=\"fw tsm mb3\">&#9203; SMP Backup importieren</div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#9203; SMP Backup importieren</div>"
 +"<label class=\"btn btn-g btn-sm\" style=\"cursor:pointer\">&#128228; SMP Backup laden"
 +"<input type=\"file\" accept=\".json\" style=\"display:none\" onchange=\"doImport(event)\"></label>"
-+"</div></div>";
++"</div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128218; Wissensdatenbank URL</div><div style=\"font-size:11px;color:var(--text3);margin-bottom:8px\">URL der RC Know-How App (GitHub Pages)</div><div style=\"display:flex;gap:8px\"><input id=\"set-khurl\" class=\"fi\" style=\"flex:1\" placeholder=\"https://uri2503.github.io/RC-KnowHow/\" value=\""+(d.settings&&d.settings.knowhowUrl?d.settings.knowhowUrl:"")+"\"><button onclick=\"saveKnowHowUrl()\" class=\"btn btn-p btn-sm\">Speichern</button></div></div>"
++"</div>";
 }
-function saveWR(){var d=D();d.settings.werkstattPlaetze=GI("wr-plaetze")||0;saveData();render();toast("Werkstatt-Ressourcen gespeichert ✓","ok");}
+function saveWR(){var d=D();var wt={};WERKSTATT_TYPEN.forEach(function(w){wt[w.key]=GI("wr-"+w.key)||0;});d.settings.werkstattTypen=wt;saveData();render();toast("Werkstatt-Ressourcen gespeichert ✓","ok");}
 function saveBK(){var d=D();d.settings.miete=parseFloat((document.getElementById('bk-miete')||{value:'0'}).value)||0;d.settings.strom=parseFloat((document.getElementById('bk-strom')||{value:'0'}).value)||0;d.settings.agk=parseFloat((document.getElementById('bk-agk')||{value:'0'}).value)||0;d.settings.personal=parseFloat((document.getElementById('bk-personal')||{value:'0'}).value)||0;var _bk=(+(d.settings.miete))+(+(d.settings.strom))+(+(d.settings.agk))+(+(d.settings.personal));saveData();render();toast('BK: '+_bk.toFixed(2)+'\u20ac/h | Ertrag: '+(d.settings.ss-_bk).toFixed(2)+'\u20ac/h \u2713','ok');}
 function openM(h,lg){
 E("MOD").innerHTML="<div class=\"movl\" id=\"MOVL\"><div class=\"modal"+(lg?" modal-lg":"")+"\" id=\"MBOX\">"+h+"</div></div>";
@@ -1811,6 +1824,10 @@ openM(MH(p?"Projekt bearbeiten":"Neues Projekt")
 +"<div class=\"fg\"><label class=\"fl\">Art des Projekts</label><select class=\"fsel\" id=\"pm-art\" onchange=\"togPMArt()\">"
 +"<option value=\"kunde\""+(art==="kunde"?" selected":"")+">Kundenprojekt</option>"
 +"<option value=\"intern\""+(art==="intern"?" selected":"")+">Intern (Eigenbestand/Wiederverkauf)</option></select></div>"
++"<div class=\"fg\"><label class=\"fl\">Aktueller Werkstatt-Platz</label><select class=\"fsel\" id=\"pm-pt\">"
++"<option value=\"\""+(!p||!p.platzTyp?" selected":"")+">-- kein Platz zugewiesen --</option>"
++WERKSTATT_TYPEN.map(function(wt){return "<option value=\""+wt.key+"\""+(p&&p.platzTyp===wt.key?" selected":"")+">"+wt.label+"</option>";}).join("")
++"</select></div>"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Start</label><input class=\"fi\" type=\"date\" id=\"pm-sd\" value=\""+(p?p.start:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Ziel</label><input class=\"fi\" type=\"date\" id=\"pm-ed\" value=\""+(p?p.ende:"")+"\"></div></div>"
 +"<div class=\"frow3\"><div class=\"fg\"><label class=\"fl\">Plankosten (&euro;)</label><input class=\"fi\" type=\"number\" id=\"pm-pk\" value=\""+(p?p.planK:"")+"\"></div>"
@@ -1832,7 +1849,7 @@ openM(MH(p?"Projekt bearbeiten":"Neues Projekt")
 function togPMArt(){var f=E("pm-intern-fields");if(f)f.style.display=GV("pm-art")==="intern"?"block":"none";}
 function saveP(id){
 var d=D();
-var data={name:GV("pm-n"),vid:GV("pm-v"),status:GV("pm-s"),art:GV("pm-art")||"kunde",start:GV("pm-sd"),ende:GV("pm-ed"),planK:GF("pm-pk"),planZ:GF("pm-pz"),ss:GF("pm-ss"),kaufpreis:GF("pm-kp"),zielVK:GF("pm-zvk"),smpProj:GV("pm-smp"),info:GV("pm-i")};
+var data={name:GV("pm-n"),vid:GV("pm-v"),status:GV("pm-s"),art:GV("pm-art")||"kunde",platzTyp:GV("pm-pt"),start:GV("pm-sd"),ende:GV("pm-ed"),planK:GF("pm-pk"),planZ:GF("pm-pz"),ss:GF("pm-ss"),kaufpreis:GF("pm-kp"),zielVK:GF("pm-zvk"),smpProj:GV("pm-smp"),info:GV("pm-i")};
 if(!data.name){toast("Name fehlt.","err");return;}
 if(id){var p=getP(id);for(var k in data)p[k]=data[k];}
 else{data.id=uid();data.gruppen=[];data.demontage=[];data.teile=[];data.tagebuch=[];d.projects.push(data);}
@@ -5312,5 +5329,4 @@ function saveKnowHowUrl(){
 }
 </script>
 </body>
-</html>+"<div class=\\"card mb3\\"><div class=\\"fw tsm mb3\\">&#128218; Wissensdatenbank URL</div><div style=\\"font-size:11px;color:var(--text3);margin-bottom:8px\\">URL der RC Know-How App (GitHub Pages)</div><div style=\\"display:flex;gap:8px\\"><input id=\\"set-khurl\\" class=\\"fi\\" style=\\"flex:1\\" placeholder=\\"https://uri2503.github.io/RC-KnowHow/\\" value=\\""+(d.settings&&d.settings.knowhowUrl?d.settings.knowhowUrl:"")+"\\"><button onclick=\\"saveKnowHowUrl()\\" class=\\"btn btn-p btn-sm\\">Speichern</button></div></div>"
-+
+</html>
