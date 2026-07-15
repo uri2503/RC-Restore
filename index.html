@@ -84,7 +84,8 @@
     <div style="color:rgba(255,255,255,.3);font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-top:3px">Complete Manager</div>
     <div style="width:36px;height:2px;background:#c41230;margin:14px auto"></div>
     <div id="login-mandant" style="color:rgba(255,255,255,.3);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px"></div>
-    <input type="password" id="login-pw" placeholder="Passwort" style="width:100%;background:#1a1715;border:1px solid rgba(196,18,48,.3);color:#fff;padding:11px 14px;font-size:15px;text-align:center;outline:none;margin-bottom:10px">
+    <input type="email" id="login-email" placeholder="E-Mail" autocomplete="username" style="width:100%;background:#1a1715;border:1px solid rgba(196,18,48,.3);color:#fff;padding:11px 14px;font-size:15px;text-align:center;outline:none;margin-bottom:10px">
+    <input type="password" id="login-pw" placeholder="Passwort" autocomplete="current-password" style="width:100%;background:#1a1715;border:1px solid rgba(196,18,48,.3);color:#fff;padding:11px 14px;font-size:15px;text-align:center;outline:none;margin-bottom:10px">
     <button onclick="doLogin()" style="width:100%;background:#c41230;color:#fff;border:none;padding:12px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:1px;text-transform:uppercase">Zugang</button>
     <div id="login-err" style="color:#f87171;font-size:12px;height:16px;margin-top:8px"></div>
   </div>
@@ -215,80 +216,110 @@ function uid2(){ return Math.random().toString(36).slice(2)+Date.now().toString(
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 
-// ── INDEXEDDB STORAGE ENGINE ──────────────────────────────────────
-var IDB = null;
-var IDB_NAME = 'riedel_classics_v1';
-var IDB_STORE = 'app_data';
-var IDB_READY = false;
+// ── SUPABASE BACKEND ──────────────────────────────────────────────
+// Replaces the former IndexedDB-only storage: data now lives centrally in
+// Supabase (table app_state, one row per Mandant/org), visible to every
+// logged-in team member instead of being stuck in a single browser.
+var SUPABASE_URL = "https://hwimtcvohtvtovdtfwld.supabase.co";
+var SUPABASE_ANON_KEY = "sb_publishable_LZ79JjEWcb5N1gkSQI-rhg_p2ATJ-Rj";
+var SB_SESSION = null;   // {access_token, refresh_token, expires_at, user}
+var SB_ROW_ID = null;    // app_state.id for the current Mandant
+var SB_CACHE = {data:null, smp:null}; // last-known row contents, read synchronously by idbGet
+var IDB_READY = false;   // kept as a name for back-compat with existing call sites/checks
 
-function initIDB(callback){
-  try {
-    var req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = function(e){
-      var db = e.target.result;
-      if(!db.objectStoreNames.contains(IDB_STORE)){
-        db.createObjectStore(IDB_STORE, {keyPath:'key'});
-      }
-    };
-    req.onsuccess = function(e){
-      IDB = e.target.result;
-      IDB_READY = true;
-      console.log('IndexedDB ready');
-      if(callback) callback(true);
-    };
-    req.onerror = function(e){
-      console.warn('IndexedDB failed, using localStorage fallback:', e);
-      IDB_READY = false;
-      if(callback) callback(false);
-    };
-  } catch(e){
-    console.warn('IndexedDB not available:', e);
-    if(callback) callback(false);
-  }
+function sbHeaders(extra){
+  var h = {"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"};
+  if(SB_SESSION && SB_SESSION.access_token) h["Authorization"] = "Bearer "+SB_SESSION.access_token;
+  if(extra) for(var k in extra) h[k] = extra[k];
+  return h;
+}
+
+function sbSaveSession(){ try{ localStorage.setItem("sb_session", JSON.stringify(SB_SESSION)); }catch(e){} }
+function sbRestoreSession(){
+  try{ var raw=localStorage.getItem("sb_session"); if(raw) SB_SESSION=JSON.parse(raw); }catch(e){}
+  return !!(SB_SESSION && SB_SESSION.access_token);
+}
+
+function sbLogin(email, password, callback){
+  fetch(SUPABASE_URL+"/auth/v1/token?grant_type=password", {
+    method:"POST", headers: sbHeaders(), body: JSON.stringify({email:email, password:password})
+  }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+  .then(function(res){
+    if(res.ok && res.body.access_token){
+      SB_SESSION = res.body; sbSaveSession(); callback(true);
+    } else {
+      callback(false, (res.body&&(res.body.error_description||res.body.msg))||"Login fehlgeschlagen");
+    }
+  }).catch(function(e){ callback(false, e.message); });
+}
+
+function sbRefreshSession(callback){
+  if(!SB_SESSION || !SB_SESSION.refresh_token){ if(callback)callback(false); return; }
+  fetch(SUPABASE_URL+"/auth/v1/token?grant_type=refresh_token", {
+    method:"POST", headers: sbHeaders(), body: JSON.stringify({refresh_token: SB_SESSION.refresh_token})
+  }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+  .then(function(res){
+    if(res.ok && res.body.access_token){ SB_SESSION=res.body; sbSaveSession(); if(callback)callback(true); }
+    else { SB_SESSION=null; try{localStorage.removeItem("sb_session");}catch(e){} if(callback)callback(false); }
+  }).catch(function(){ if(callback)callback(false); });
+}
+
+function sbLogout(callback){
+  SB_SESSION=null; SB_ROW_ID=null; SB_CACHE={data:null,smp:null};
+  try{ localStorage.removeItem("sb_session"); }catch(e){}
+  if(callback)callback();
+}
+
+// Loads (or, on first use for a Mandant, creates) the single app_state row and
+// caches its two JSON columns so idbGet() below can stay synchronous like before.
+function sbEnsureRow(callback){
+  fetch(SUPABASE_URL+"/rest/v1/app_state?org=eq."+encodeURIComponent(MANDANT)+"&select=id,data,smp", {headers: sbHeaders()})
+  .then(function(r){
+    if(r.status===401){ return sbRefreshThenRetry(sbEnsureRow, callback); }
+    return r.json();
+  }).then(function(rows){
+    if(!rows) return; // already handled by refresh-retry path
+    if(rows.length){
+      SB_ROW_ID=rows[0].id; SB_CACHE={data:rows[0].data||{}, smp:rows[0].smp||{}};
+      IDB_READY=true; callback(true);
+    } else {
+      fetch(SUPABASE_URL+"/rest/v1/app_state", {
+        method:"POST", headers: sbHeaders({"Prefer":"return=representation"}),
+        body: JSON.stringify({org: MANDANT, data:{}, smp:{}})
+      }).then(function(r){ return r.json(); })
+      .then(function(created){
+        var row = created && created[0];
+        if(row){ SB_ROW_ID=row.id; SB_CACHE={data:{}, smp:{}}; IDB_READY=true; callback(true); }
+        else callback(false);
+      }).catch(function(){ callback(false); });
+    }
+  }).catch(function(){ callback(false); });
+}
+
+function sbRefreshThenRetry(fn, callback){
+  sbRefreshSession(function(ok){
+    if(ok) fn(callback); else callback(false);
+  });
 }
 
 function idbSet(key, value, callback){
-  if(!IDB_READY || !IDB){
-    // Fallback to localStorage
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){}
+  var col = key===CR_KEY ? "data" : key===SMP_KEY ? "smp" : null;
+  if(!col || !SB_ROW_ID){ if(callback) callback(); return; }
+  SB_CACHE[col] = value;
+  var body={}; body[col]=value;
+  fetch(SUPABASE_URL+"/rest/v1/app_state?id=eq."+SB_ROW_ID, {method:"PATCH", headers: sbHeaders(), body: JSON.stringify(body)})
+  .then(function(r){
+    if(r.status===401){ sbRefreshSession(function(ok){
+      if(ok) fetch(SUPABASE_URL+"/rest/v1/app_state?id=eq."+SB_ROW_ID, {method:"PATCH", headers: sbHeaders(), body: JSON.stringify(body)}).then(function(){if(callback)callback();}).catch(function(){if(callback)callback();});
+      else if(callback) callback();
+    }); return; }
     if(callback) callback();
-    return;
-  }
-  try {
-    var tx = IDB.transaction(IDB_STORE, 'readwrite');
-    var store = tx.objectStore(IDB_STORE);
-    var req = store.put({key: key, value: value, ts: Date.now()});
-    req.onsuccess = function(){ if(callback) callback(); };
-    req.onerror = function(e){ console.error('idbSet error:', e); if(callback) callback(); };
-  } catch(e){
-    console.error('idbSet exception:', e);
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch(le){}
-    if(callback) callback();
-  }
+  }).catch(function(e){ console.error('idbSet (Supabase) error:', e); if(callback) callback(); });
 }
 
 function idbGet(key, callback){
-  if(!IDB_READY || !IDB){
-    // Fallback to localStorage
-    try {
-      var v = localStorage.getItem(key);
-      callback(v ? JSON.parse(v) : null);
-    } catch(e){ callback(null); }
-    return;
-  }
-  try {
-    var tx = IDB.transaction(IDB_STORE, 'readonly');
-    var store = tx.objectStore(IDB_STORE);
-    var req = store.get(key);
-    req.onsuccess = function(e){
-      var result = e.target.result;
-      callback(result ? result.value : null);
-    };
-    req.onerror = function(){ callback(null); };
-  } catch(e){
-    console.error('idbGet exception:', e);
-    callback(null);
-  }
+  var col = key===CR_KEY ? "data" : key===SMP_KEY ? "smp" : null;
+  callback(col ? SB_CACHE[col] : null);
 }
 
 function saveData(){
@@ -1622,10 +1653,10 @@ return "<div class=\"page\"><div class=\"pt mb3\">Stammdaten &amp; Einstellungen
 +"<div class=\"frow mb2\"><div class=\"fg\"><label class=\"fl\">Anderen Mandant öffnen</label>"
 +"<input class=\"fi\" id=\"new-mandant\" placeholder=\"z.B. mueller\"></div></div>"
 +"<button class=\"btn btn-p btn-sm\" onclick=\"openMandant()\">&#127279; Wechseln</button></div>"
-+"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128272; Passwort</div>"
-+"<div class=\"fg\"><label class=\"fl\">Aktuelles Passwort</label><input type=\"password\" class=\"fi\" id=\"s-cpw\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">Neues Passwort</label><input type=\"password\" class=\"fi\" id=\"s-npw\"></div>"
-+"<button class=\"btn btn-p btn-sm\" data-action=\"savePW\">Speichern</button></div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128272; Passwort ändern</div>"
++"<div class=\"txs cm mb2\">Login: "+esc((SB_SESSION&&SB_SESSION.user&&SB_SESSION.user.email)||"—")+"</div>"
++"<div class=\"fg\"><label class=\"fl\">Neues Passwort (mind. 6 Zeichen)</label><input type=\"password\" class=\"fi\" id=\"s-npw\"></div>"
++"<button class=\"btn btn-p btn-sm\" onclick=\"savePW()\">Speichern</button></div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128202; Kennzahlen-PIN (Chefsache)</div>"
 +"<div class=\"tsm cm mb2\">Separater PIN (Standard: 0000)</div>"
 +"<div class=\"fg\"><label class=\"fl\">Neuer PIN (mind. 4)</label>"
@@ -2176,7 +2207,16 @@ toast("Unbekanntes Backup-Format","err");
 };r.readAsText(file);if(evt.target)evt.target.value="";
 }
 function importSMP(){if(E("SMP-FILE"))E("SMP-FILE").click();}
-function savePW(){var cpw=GV("s-cpw"),npw=GV("s-npw");if(cpw!==D().settings.password){toast("Aktuelles Passwort falsch.","err");return;}if(!npw){toast("Passwort fehlt.","err");return;}D().settings.password=npw;saveData();toast("Passwort ge\u00e4ndert \u2713","ok");}
+function savePW(){
+var npw=GV("s-npw");
+if(!npw||npw.length<6){toast("Mindestens 6 Zeichen.","err");return;}
+fetch(SUPABASE_URL+"/auth/v1/user",{method:"PUT",headers:sbHeaders(),body:JSON.stringify({password:npw})})
+.then(function(r){return r.json().then(function(j){return{ok:r.ok,body:j};});})
+.then(function(res){
+if(res.ok){toast("Passwort ge\u00e4ndert \u2713","ok");var pe=E("s-npw");if(pe)pe.value="";}
+else{toast("Fehler: "+((res.body&&res.body.msg)||"unbekannt"),"err");}
+}).catch(function(e){toast("Fehler: "+e.message,"err");});
+}
 function saveSS(){var ss=GF("s-ss");if(ss>0){D().settings.ss=ss;saveData();toast("Gespeichert \u2713","ok");}}
 document.addEventListener("click",function(e){
 var t=e.target;
@@ -4131,11 +4171,11 @@ var zCount=(APP.smp.zeit||[]).length;
 var photoCount=0;
 for(var i=0;i<APP.data.vehicles.length;i++) photoCount+=(APP.data.vehicles[i].bild||[]).length;
 var el=E('stor-size');
-if(el)el.innerHTML='<strong>IndexedDB</strong> (kein Limit) &bull; '+vCount+' Fahrzeuge &bull; '+pCount+' Projekte &bull; '+zCount+' Zeiten &bull; '+photoCount+' Fotos';
+if(el)el.innerHTML='<strong>Supabase</strong> (zentral, alle Geräte) &bull; '+vCount+' Fahrzeuge &bull; '+pCount+' Projekte &bull; '+zCount+' Zeiten &bull; '+photoCount+' Fotos';
 }
 function cleanStorage(){
 saveData();
-toast('Gespeichert (IndexedDB - kein Groessenlimit)','ok');
+toast('In Supabase gespeichert','ok');
 setTimeout(checkStorageUsage,300);
 }
 function stripVehiclePhotos(){
@@ -4149,27 +4189,39 @@ if(!m){toast("Bitte Mandant-ID eingeben","err");return;}
 window.location.href=window.location.origin+window.location.pathname+"?mandant="+m;
 }
 function initLogin(){
-try{if(sessionStorage.getItem("auth_"+MANDANT)==="1"){nav("dashboard");return;}}catch(e){}
 var el=E("LOGIN");if(el)el.style.display="flex";
 var sl=document.querySelector(".s-logo img");var ll=E("login-logo");if(sl&&ll)ll.src=sl.src;
 var lm=E("login-mandant");if(lm)lm.textContent=MANDANT==="default"?"Riedel classics":"Mandant: "+MANDANT;
-var pw=E("login-pw");if(pw){pw.focus();pw.onkeydown=function(e){if(e.key==="Enter")doLogin();};}
+var em=E("login-email");if(em)em.focus();
+var pw=E("login-pw");if(pw)pw.onkeydown=function(e){if(e.key==="Enter")doLogin();};
+if(em)em.onkeydown=function(e){if(e.key==="Enter")E("login-pw").focus();};
+}
+function afterLogin(){
+var el=E("LOGIN");if(el)el.style.display="none";
+sbEnsureRow(function(ok){
+if(!ok){toast("Verbindung zur Datenbank fehlgeschlagen.","err");return;}
+loadDataAsync(function(){ nav("dashboard"); });
+});
 }
 function doLogin(){
-var pw=GV("login-pw"),correct=(D().settings&&D().settings.password)||"1234";
-if(pw===correct){
-var el=E("LOGIN");if(el)el.style.display="none";
-try{sessionStorage.setItem("auth_"+MANDANT,"1");}catch(e){}
-nav("dashboard");
-}else{
-var err=E("login-err");if(err){err.textContent="\u274C Falsches Passwort";setTimeout(function(){err.textContent="";},2000);}
+var email=GV("login-email"),pw=GV("login-pw");
+if(!email||!pw){var err=E("login-err");if(err)err.textContent="Bitte E-Mail und Passwort eingeben";return;}
+var btn=document.querySelector('#LOGIN button');if(btn)btn.disabled=true;
+sbLogin(email,pw,function(ok,msg){
+if(btn)btn.disabled=false;
+if(ok){ afterLogin(); }
+else{
+var err=E("login-err");if(err){err.textContent="\u274C "+(msg||"Login fehlgeschlagen");setTimeout(function(){err.textContent="";},3000);}
 var pe=E("login-pw");if(pe)pe.value="";
 }
+});
 }
 function doLogout(){
-try{sessionStorage.removeItem("auth_"+MANDANT);}catch(e){}
+sbLogout(function(){
 var el=E("LOGIN");if(el)el.style.display="flex";
-var pe=E("login-pw");if(pe){pe.value="";pe.focus();}
+var pe=E("login-pw");if(pe)pe.value="";
+var ee=E("login-email");if(ee){ee.value="";ee.focus();}
+});
 }
 function closeBefundPrint(){var el=E("BEFUND-PRINT");if(el)el.remove();}
 function expandAllBefund(){document.querySelectorAll("#MC details").forEach(function(s){s.open=true;});};
@@ -4179,55 +4231,30 @@ if(E("BTN-IMP"))E("BTN-IMP").addEventListener("click",function(){if(E("IMP-FILE"
 if(E("IMP-FILE"))E("IMP-FILE").addEventListener("change",function(ev){var f=ev.target?ev.target.files[0]:null;if(f)importBackup(f);});
 if(E("SMP-FILE"))E("SMP-FILE").addEventListener("change",doImport);
 
-// Initialize IndexedDB then load data
-// Safety timeout: if IDB init takes >3s, start anyway
-var _startTimeout = setTimeout(function(){
-  console.warn('IDB timeout - starting without IDB');
-  IDB_READY = false;
-  // Try loading from localStorage directly
-  try {
-    var cr = localStorage.getItem(CR_KEY);
-    if(cr){ var d=JSON.parse(cr);
-      if(d&&d.vehicles){APP.data.vehicles=d.vehicles||[];APP.data.projects=d.projects||[];APP.data.settings=d.settings||APP.data.settings;}
-    }
-  } catch(e){}
-  try {
-    var sm = localStorage.getItem(SMP_KEY);
-    if(sm){ var s=JSON.parse(sm);
-      if(s.zeit) APP.smp.zeit=s.zeit;
-      if(s.kw) APP.smp.kw=s.kw;
-      if(s.auf) APP.smp.auf=s.auf;
-      if(s.id) APP.smp.id=s.id;
-    }
-  } catch(e){}
-  initLogin();
-}, 3000);
-
-initIDB(function(ok){
-  loadDataAsync(function(){
-    clearTimeout(_startTimeout);
-    // Cleanup old localStorage keys after migration
-    try {
-      var _oldKeys=['smp_v4','smp_v3','smp_v2','smp_v1'];
-      for(var _ki=0;_ki<_oldKeys.length;_ki++) try{localStorage.removeItem(_oldKeys[_ki]);}catch(e){}
-    } catch(e){}
-    initLogin();
-  });
-});
+// Boot: restore an existing Supabase session, or show the login screen.
+// Data now lives in the app_state table (see sbEnsureRow) instead of IndexedDB.
 var _smn=E("sm-mn");if(_smn&&MANDANT!=="default")_smn.textContent="Mandant: "+MANDANT;
-nav("dashboard");
 window.addEventListener("beforeunload",function(e){
 if(_DIRTY){var msg="Ungespeicherte Daten! Vollbackup erstellen?";e.returnValue=msg;return msg;}
 });
-setInterval(function(){
-try{
-var kb=Math.round(((localStorage.getItem(CR_KEY)||"").length+(localStorage.getItem(SMP_KEY)||"").length)/1024);
-var ind=document.getElementById("save-ind");
-if(ind&&kb>4000){
-ind.style.background="#cc9200";ind.title="Speicher "+kb+"KB/~5000KB — Backup empfohlen!";
+
+var _bootTimeout=setTimeout(function(){
+  var mc=E("MC");if(mc)mc.innerHTML="<div class=\"page\"><p class=\"cm txs\">Verbindung zur Datenbank dauert ungewöhnlich lange. Bitte Internetverbindung prüfen und Seite neu laden.</p></div>";
+},10000);
+
+if(sbRestoreSession()){
+  sbEnsureRow(function(ok){
+    clearTimeout(_bootTimeout);
+    if(ok){ loadDataAsync(function(){ nav("dashboard"); }); }
+    else { initLogin(); }
+  });
+} else {
+  clearTimeout(_bootTimeout);
+  initLogin();
 }
-}catch(e){}
-},30000);
+
+// Keep the Supabase session alive across a long workshop shift (tokens expire ~1h).
+setInterval(function(){ if(SB_SESSION) sbRefreshSession(); }, 45*60*1000);
 }catch(ex){
 var mc=E("MC");
 if(mc)mc.innerHTML="<div style=\"padding:20px;background:#fde8ec;border-radius:8px;margin:20px;font-family:monospace;font-size:11px;color:#c41230\"><strong>Start-Fehler:</strong> "+ex.message+"</div>";
