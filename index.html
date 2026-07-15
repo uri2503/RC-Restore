@@ -24,6 +24,7 @@
   <div class="ni" data-v="vehicles">&#128664; Fahrzeuge</div>
   <div class="ni" data-v="projects">&#128203; Projekte</div>
   <div class="ni" data-v="groups">&#128196; Gruppen</div>
+  <div class="ni" data-v="fp">&#127981; Fertigungsplanung</div>
   <div id="PNAV" style="display:none">
     <div class="nlbl">Aktives Projekt</div>
     <div class="ni" data-v="po">&#9672; Übersicht</div>
@@ -39,6 +40,7 @@
   <div class="ni" data-v="kunden">&#128100; Kundenstamm</div>
   <div class="ni" data-v="teilesuche">&#128269; Teilesuche</div>
   <div class="ni" data-v="kalkulation">&#128203; Kalkulation</div>
+  <div class="ni" onclick="navScenario()" style="cursor:pointer">&#128202; Szenariorechner</div>
   <div class="nlbl">RC Dev</div>
   <div class="ni" data-v="rcdev">&#128187; RC Dev</div>
   <div class="nlbl">Wochenplanung</div>
@@ -412,23 +414,36 @@ if(!e.proj)return false;
 if(e.proj===smpProj)return true;
 // Case-insensitive match
 if(e.proj.toLowerCase()===projLower)return true;
-// Partial match: entry proj contains project name or vice versa
-if(e.proj.toLowerCase().indexOf(projLower)>=0)return true;
-if(projLower.indexOf(e.proj.toLowerCase())>=0)return true;
-// Match via RM project smpProj field
-var d2=D().projects;
-for(var i=0;i<d2.length;i++){
-  var p2=d2[i];
-  if(p2.name===smpProj||p2.smpProj===smpProj||(p2.name&&p2.name.toLowerCase()===projLower)){
-    if(e.proj===p2.name||e.proj===p2.smpProj)return true;
-    if(p2.name&&e.proj.toLowerCase().indexOf(p2.name.toLowerCase())>=0)return true;
-  }
-}
 return false;
 });
 }
+// Exact-match project id lookup (no fuzzy/substring matching) used to tag new zeit entries with a stable pid
+function matchProjectId(projName){
+if(!projName)return"";
+var d2=D().projects;
+for(var i=0;i<d2.length;i++){
+  var p2=d2[i];
+  if(p2.name===projName||p2.smpProj===projName)return p2.id;
+}
+return"";
+}
+// Rename-proof lookup: prefers zeit entries tagged with this project's id, falls back to
+// name-based getSMPTime() for legacy entries recorded before the pid field existed.
+function getSMPTimeForProject(p){
+if(!p)return[];
+if(p.id){
+  var byId=APP.smp.zeit.filter(function(e){return e.pid===p.id;});
+  if(byId.length)return byId;
+}
+return getSMPTime(p.smpProj||p.name);
+}
 function getSMPTimeH(smpProj){
 var entries=getSMPTime(smpProj),h=0;
+for(var i=0;i<entries.length;i++)h+=(entries[i].dur||0)/3600000;
+return h;
+}
+function getSMPTimeHForProject(p){
+var entries=getSMPTimeForProject(p),h=0;
 for(var i=0;i<entries.length;i++)h+=(entries[i].dur||0)/3600000;
 return h;
 }
@@ -437,11 +452,87 @@ var pk=0,thCR=0,thSMP=0;
 for(var i=0;i<p.teile.length;i++)pk+=p.teile[i].kosten||0;
 var pkEK=0;for(var i=0;i<p.teile.length;i++)pkEK+=p.teile[i].ek>0?p.teile[i].ek:p.teile[i].kosten||0;
 for(var i=0;i<p.tagebuch.length;i++)thCR+=parseFloat(p.tagebuch[i].zeit)||0;
-var smpKey=p.smpProj||p.name;if(smpKey)thSMP=getSMPTimeH(smpKey);
+thSMP=getSMPTimeHForProject(p);
 var th=thCR+thSMP;
 var rate=p.ss||D().settings.ss||90;
 var tk=th*rate;
 return{pk:pk,pkEK:pkEK,pkErtrag:pk-pkEK,thCR:thCR,thSMP:thSMP,th:th,tk:tk,tot:pk+tk,rate:rate};
+}
+// ── FERTIGUNGSPLANUNG: Berechnungsfunktionen — bauen auf costs() auf statt Aggregation zu duplizieren ──
+function pstIndex(status){for(var i=0;i<PST.length;i++)if(PST[i].v===status)return i;return 0;}
+// Item-level ma[] overrides the parent Baugruppe's ma[]; an empty item list inherits the group's assignees.
+function effectiveMA(g,it){return(it.ma&&it.ma.length)?it.ma:(g.ma||[]);}
+function remHoursByMA(p){
+var out={};
+for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
+for(var j=0;j<g.items.length;j++){var it=g.items[j];
+var rem=Math.max(0,(it.planZ||0)-(it.istZ||0));
+if(rem<=0)continue;
+var ma=effectiveMA(g,it);
+for(var k=0;k<ma.length;k++)out[ma[k]]=(out[ma[k]]||0)+rem;
+}}
+return out;
+}
+function remHoursForMA(p,maId){return remHoursByMA(p)[maId]||0;}
+// "Noch offen" = Status vor s6 (Einbaubereit); Teile ohne Bestelldatum/Lieferzeit werden als unknownLead markiert statt ignoriert.
+function remPartsForProject(p,opts){
+var cutoff=pstIndex((opts&&opts.uptoStatus)||"s5");
+var teile=p.teile.filter(function(t){return pstIndex(t.status)<=cutoff;});
+var cost=0,maxLeadDays=0,projectedReadyDate=null,unknownLead=false;
+for(var i=0;i<teile.length;i++){var t=teile[i];
+cost+=t.ek>0?t.ek:t.kosten||0;
+if(t.bestelldatum&&t.lieferzeitTage){
+var d=new Date(t.bestelldatum);d.setDate(d.getDate()+(t.lieferzeitTage||0));
+if(!projectedReadyDate||d>projectedReadyDate)projectedReadyDate=d;
+if((t.lieferzeitTage||0)>maxLeadDays)maxLeadDays=t.lieferzeitTage;
+}else{unknownLead=true;}
+}
+return{count:teile.length,cost:cost,maxLeadDays:maxLeadDays,projectedReadyDate:projectedReadyDate?projectedReadyDate.toISOString().slice(0,10):null,unknownLead:unknownLead,teile:teile};
+}
+// MA/Werkstatt ohne konfigurierte Kapazität gelten als "unbekannt", nicht als überlastet.
+function capacityCheck(referenceDate){
+var d=D(),ref=referenceDate||new Date();
+var activeProjects=d.projects.filter(function(p){return p.status==="Aktiv";});
+var byMA=(d.mitarbeiter||[]).map(function(m){
+var remH=0,soonestEnde=null;
+for(var i=0;i<activeProjects.length;i++){var p=activeProjects[i];
+var h=remHoursForMA(p,m.id);
+if(h>0){remH+=h;if(p.ende&&(!soonestEnde||p.ende<soonestEnde))soonestEnde=p.ende;}
+}
+var unknown=!(m.wochenkapazitaet>0);
+var weeks=1,feasible=null;
+if(!unknown){
+if(soonestEnde){var endeD=new Date(soonestEnde);weeks=Math.max(1,Math.ceil((endeD-ref)/(7*24*3600000)));}
+feasible=remH<=m.wochenkapazitaet*weeks;
+}
+return{maId:m.id,name:m.name,weeklyCapH:m.wochenkapazitaet||0,remH:remH,weeksToDeadline:weeks,feasible:feasible,unknown:unknown};
+});
+var werkstattPlaetze=d.settings.werkstattPlaetze||0;
+var bays={active:activeProjects.length,capacity:werkstattPlaetze,feasible:werkstattPlaetze>0?activeProjects.length<=werkstattPlaetze:null};
+return{byMA:byMA,bays:bays};
+}
+// Nur sinnvoll für art==='intern': Kapital, das in einem zurückgestellten Eigenprojekt gebunden ist.
+function capitalTiedUp(p){
+var c=costs(p);
+var ageDays=p.start?Math.floor((new Date()-new Date(p.start))/86400000):0;
+return{kaufpreis:p.kaufpreis||0,spentParts:c.pkEK,spentLabor:c.tk,capital:(p.kaufpreis||0)+c.pkEK+c.tk,ageDays:ageDays};
+}
+// Szenariorechner: Restkosten bis Fertigstellung, bei internen Projekten zusätzlich Marge gegen Zielverkaufspreis.
+function scenarioCalc(p){
+var c=costs(p);
+var byMA=remHoursByMA(p),remH=0;for(var k in byMA)remH+=byMA[k];
+var rate=p.ss||D().settings.ss||90;
+var remHoursCost=remH*rate;
+var remParts=remPartsForProject(p);
+var alreadySpent=c.pkEK+c.tk;
+var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remHoursCost;
+var res={remHours:remH,remHoursByMA:byMA,remHoursCost:remHoursCost,remParts:remParts,alreadySpent:alreadySpent,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
+if(p.art==="intern"){
+res.zielVK=p.zielVK||0;
+res.margin=res.zielVK-totalCostToComplete;
+res.verdict=res.margin>=0?"wirtschaftlich":"unwirtschaftlich";
+}
+return res;
 }
 function badge(cls,txt){return "<span class=\"badge "+cls+"\">"+txt+"</span>";}
 function pjb(s){var m={Aktiv:"b-red",Planung:"b-gray",Pausiert:"b-gray",Abgeschlossen:"b-green"};return badge(m[s]||"b-gray",s);}
@@ -479,9 +570,10 @@ try{
 var fn={"dashboard":vDash,"vehicles":vVeh,"projects":vProj,"groups":vGrp,
 "po":vPO,"pp":vPP,"pd":vPD,"pt":vPT,"pb":vPB,"pz":vPZ,"pbf":vPBF,
 "zeit":vZeit,"zeitliste":vZeitListe,"zeitrep":vZeitRep,
-"kennzahlen":vKZ,"reports":vRep,"settings":vSet}[APP.view];
+"kennzahlen":vKZ,"reports":vRep,"settings":vSet,"fp":vFP,"scenario":vScenario}[APP.view];
 mc.innerHTML=fn?fn():"<div class=\"page\"><p>Nicht gefunden</p></div>";
 if(APP.view==="reports")setTimeout(renderRepAnalyse,80);
+if(APP.view==="scenario")setTimeout(renderScenario,80);
 if(APP.view==="settings")setTimeout(checkStorageUsage,100);
 if(APP.view==="zeit")checkStampTimer();
 }catch(ex){
@@ -676,6 +768,90 @@ return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div><div class=\"pt
 +"<button class=\"btn btn-p\" data-action=\"editGV\">+ Gruppe</button></div>"
 +"<div class=\"card\">"+rows+"</div></div>";
 }
+function vFP(){
+var d=D(),cc=capacityCheck();
+var activeProjects=d.projects.filter(function(p){return p.status==="Aktiv";});
+var maById={};for(var i=0;i<(d.mitarbeiter||[]).length;i++)maById[d.mitarbeiter[i].id]=d.mitarbeiter[i].name;
+var capRows=cc.byMA.map(function(m){
+var stat=m.unknown?badge("b-gray","Kapazität unbekannt"):badge(m.feasible?"b-green":"b-red",m.feasible?"OK":"Überlastet");
+return "<div class=\"flex fac fjb\" style=\"padding:6px 0;border-bottom:1px solid var(--bg3)\">"
++"<span class=\"tsm\">"+esc(m.name)+"</span>"
++"<span class=\"tsm cm\">"+FMTH(m.remH)+" offen"+(m.unknown?"":" / "+m.weeklyCapH+"h/Wo")+"</span>"
++stat+"</div>";
+}).join("");
+var bayBadge=cc.bays.capacity>0?badge(cc.bays.feasible?"b-green":"b-red",cc.bays.active+" / "+cc.bays.capacity+" Plätze belegt"):badge("b-gray","Werkstattplätze nicht konfiguriert");
+var cards=activeProjects.map(function(p){
+var v=getV(p.vid);
+var byMA=remHoursByMA(p);
+var maChips=Object.keys(byMA).map(function(mid){return badge("b-blue",(maById[mid]||"?")+": "+FMTH(byMA[mid]));}).join(" ");
+var rp=remPartsForProject(p);
+var ct=p.art==="intern"?capitalTiedUp(p):null;
+var capBadge=ct?badge("b-amber","Kapital: "+FMT(ct.capital)+" ("+ct.ageDays+" Tage)"):"";
+return "<div class=\"pc\" data-action=\"navp\" data-id=\"po\" data-id2=\""+p.id+"\" style=\"margin-bottom:10px\">"
++"<div class=\"flex fac fjb mb2\"><strong>"+esc(p.name)+"</strong>"+pjb(p.status)+"</div>"
++"<div class=\"txs cm mb2\">"+(v?esc(v.marke+" "+v.modell):"")+" · "+(p.art==="intern"?"Intern":"Kunde")+"</div>"
++"<div class=\"mb2\">"+(maChips||"<span class=\"txs cm\">Keine Mitarbeiter zugeordnet</span>")+"</div>"
++"<div class=\"flex fac fjb tsm\"><span>Offene Teile: <strong>"+rp.count+"</strong> ("+FMT(rp.cost)+")</span>"
++"<span class=\"cm\">"+(rp.projectedReadyDate?"ca. "+FMTD(rp.projectedReadyDate):(rp.unknownLead?"Lieferzeit unbekannt":"—"))+"</span></div>"
++(capBadge?"<div class=\"mt2\">"+capBadge+"</div>":"")
++"</div>";
+}).join("");
+return "<div class=\"page\"><div class=\"pt mb3\">&#127981; Fertigungsplanung</div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Mitarbeiter-Auslastung (aktive Projekte)</div>"
++(capRows||"<p class=\"txs cm\">Keine Mitarbeiter angelegt (siehe Stammdaten).</p>")
++"<div class=\"divid\"></div><div class=\"flex fac fjb\"><span class=\"tsm\">Werkstattplätze</span>"+bayBadge+"</div>"
++"</div>"
++"<div class=\"g2\">"+(cards||"<p class=\"cm txs\">Keine aktiven Projekte.</p>")+"</div></div>";
+}
+function vScenario(){
+var d=D();
+if(!d.projects.length)return "<div class=\"page\"><div class=\"pt mb3\">&#128202; Szenariorechner</div><div class=\"empty\"><p>Noch keine Projekte angelegt.</p></div></div>";
+var internFirst=d.projects.filter(function(p){return p.art==="intern";})[0];
+var defId=(internFirst||d.projects[0]).id;
+var opts=d.projects.map(function(p){return "<option value=\""+p.id+"\""+(p.id===defId?" selected":"")+">"+esc(p.name)+(p.art==="intern"?" (intern)":"")+"</option>";}).join("");
+return "<div class=\"page\"><div class=\"pt mb3\">&#128202; Szenariorechner</div>"
++"<div class=\"card mb3\"><div class=\"fg\"><label class=\"fl\">Projekt</label><select class=\"fsel\" id=\"sc-proj\" onchange=\"renderScenario()\">"+opts+"</select></div></div>"
++"<div id=\"sc-result\"></div>"
++"<button class=\"btn btn-g btn-sm mt3\" onclick=\"KZ_UNLOCKED=false;nav('projects')\">&#128274; Sperren</button>"
++"</div>";
+}
+function renderScenario(){
+var pid=GV("sc-proj"),el=E("sc-result");if(!el)return;
+var p=getP(pid);if(!p){el.innerHTML="<div class=\"empty\"><p>Kein Projekt gewählt.</p></div>";return;}
+var d=D(),sc=scenarioCalc(p);
+var maById={};for(var i=0;i<(d.mitarbeiter||[]).length;i++)maById[d.mitarbeiter[i].id]=d.mitarbeiter[i].name;
+var maRows=Object.keys(sc.remHoursByMA).map(function(mid){return "<div class=\"flex fac fjb tsm\" style=\"padding:4px 0\"><span>"+esc(maById[mid]||"?")+"</span><span class=\"fw\">"+FMTH(sc.remHoursByMA[mid])+"</span></div>";}).join("")||"<p class=\"txs cm\">Keine Mitarbeiter zugeordnet.</p>";
+var partsRows=sc.remParts.teile.map(function(t){return "<tr><td>"+esc(t.name)+"</td><td>"+psb(t.status)+"</td><td>"+FMT(t.ek>0?t.ek:t.kosten||0)+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("");
+var html="<div class=\"g2\"><div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Reststunden je Mitarbeiter</div>"+maRows
++"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt</span><span>"+FMTH(sc.remHours)+" &times; "+(p.ss||d.settings.ss||90)+"&euro;/h = "+FMT(sc.remHoursCost)+"</span></div></div>"
++"<div class=\"card\"><div class=\"fw tsm mb3\">Offene Ersatzteile ("+sc.remParts.count+")</div>"
++(partsRows?"<div class=\"twrap\"><table><thead><tr><th>Teil</th><th>Status</th><th>Kosten</th><th>Lieferzeit</th></tr></thead><tbody>"+partsRows+"</tbody></table></div>":"<p class=\"txs cm\">Keine offenen Teile.</p>")
++"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Summe</span><span>"+FMT(sc.remParts.cost)+"</span></div>"
++(sc.remParts.projectedReadyDate?"<div class=\"txs cm mt2\">Voraussichtlich vollständig da: "+FMTD(sc.remParts.projectedReadyDate)+"</div>":"")
++(sc.remParts.unknownLead?"<div class=\"txs cm mt2\">&#9888; Für einzelne Teile ist keine Lieferzeit hinterlegt.</div>":"")
++"</div></div>"
++"<div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Kosten bis Fertigstellung</div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Kaufpreis Fahrzeug</span><span>"+FMT(sc.kaufpreis)+"</span></div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Bereits investiert (Teile+Zeit)</span><span>"+FMT(sc.alreadySpent)+"</span></div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Ersatzteile</span><span>"+FMT(sc.remParts.cost)+"</span></div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Arbeitszeit</span><span>"+FMT(sc.remHoursCost)+"</span></div>"
++"<div class=\"divid\"></div><div class=\"flex fjb\" style=\"font-size:14px\"><strong>Gesamtkosten bis fertig</strong><strong class=\"cr\">"+FMT(sc.totalCostToComplete)+"</strong></div>"
++"</div>"
++(p.art==="intern"?
+"<div class=\"card\"><div class=\"fw tsm mb3\">Wirtschaftlichkeit (intern)</div>"
++"<div class=\"fg\"><label class=\"fl\">Ziel-Verkaufspreis (&euro;)</label><input class=\"fi\" type=\"number\" id=\"sc-zvk\" value=\""+(p.zielVK||"")+"\"></div>"
++"<button class=\"btn btn-p btn-sm mb3\" onclick=\"saveScenarioZVK('"+p.id+"')\">Speichern &amp; neu berechnen</button>"
++"<div class=\"divid\"></div>"
++"<div class=\"flex fjb tsm\"><span>Marge</span><strong class=\""+(sc.margin>=0?"cg":"cr")+"\">"+FMT(sc.margin)+"</strong></div>"
++"<div class=\"mt3\">"+badge(sc.verdict==="wirtschaftlich"?"b-green":"b-red",sc.verdict==="wirtschaftlich"?"✓ Wirtschaftlich":"✕ Unwirtschaftlich")+"</div>"
++"</div>"
+:"<div class=\"card\"><p class=\"txs cm\">Wirtschaftlichkeitsrechnung nur für interne Projekte verfügbar.</p></div>")
++"</div></div>";
+el.innerHTML=html;
+}
+function saveScenarioZVK(pid){var p=getP(pid);if(!p)return;p.zielVK=GF("sc-zvk");saveData();renderScenario();toast("Gespeichert ✓","ok");}
 function pH(a){
 var p=curP(),v=getV(p.vid);
 return "<div class=\"page\"><div style=\"margin-bottom:12px\"><div class=\"flex fac g3p mb2\">"
@@ -702,7 +878,7 @@ var sr="";
 for(var i=0;i<PST.length;i++){var ps=PST[i],cnt=0;for(var j=0;j<p.teile.length;j++)if(p.teile[j].status===ps.v)cnt++;if(cnt>0)sr+=badge(ps.c,ps.i+" "+ps.l)+" <strong>"+cnt+"</strong>&nbsp;&nbsp;";}
 var re="";var tb=p.tagebuch.slice().sort(function(a,b){return b.datum.localeCompare(a.datum);});
 for(var i=0;i<tb.length&&i<3;i++){var e=tb[i];re+="<div style=\"border-left:3px solid var(--red);padding:6px 10px;margin-bottom:7px;background:var(--bg);border-radius:0 5px 5px 0\"><div class=\"txs cm\">"+FMTD(e.datum)+(e.zeit?" &bull; "+FMTH(e.zeit):"")+"</div><div class=\"tsm mt2\">"+e.info.slice(0,80)+"</div></div>";}
-var smpEntries=p.smpProj?getSMPTime(p.smpProj).slice(-3):[],smpRe="";
+var smpEntries=getSMPTimeForProject(p).slice(-3),smpRe="";
 smpEntries.sort(function(a,b){return b.date>a.date?1:-1;});
 for(var i=0;i<smpEntries.length;i++){
 var se=smpEntries[i];
@@ -742,16 +918,18 @@ return pH("o")
 +"<div class=\"g2\" style=\"gap:10px;margin-bottom:12px\">"
 +"<div class=\"stat\" style=\"padding:12px\"><div class=\"sv\" style=\"font-size:20px\">"+fi+"/"+ai+"</div><div class=\"sl\" style=\"font-size:9px\">Planpunkte</div></div>"
 +"<div class=\"stat\" style=\"padding:12px\"><div class=\"sv\" style=\"font-size:20px\">"+ein+"/"+p.teile.length+"</div><div class=\"sl\" style=\"font-size:9px\">Teile eingebaut</div></div></div>"
++(function(){var byMA=remHoursByMA(p),ids=Object.keys(byMA);if(!ids.length)return"";var mById={};for(var i=0;i<(D().mitarbeiter||[]).length;i++)mById[D().mitarbeiter[i].id]=D().mitarbeiter[i].name;
+return "<div class=\"divid\"></div><strong>&#128101; Reststunden je Mitarbeiter:</strong><div class=\"mt2\" style=\"line-height:2\">"+ids.map(function(id){return badge("b-blue",(mById[id]||"?")+": "+FMTH(byMA[id]));}).join(" ")+"</div>";})()
 +"<div class=\"divid\"></div><strong>Teile Status:</strong><div class=\"mt2\" style=\"line-height:2\">"+sr+"</div>"
 +"<div class=\"divid\"></div>"
 +"<div class=\"flex fac fjb mb2\"><strong>&#128218; Letzte Tagebuch-Eintr\u00e4ge</strong><button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"pb\">Alle</button></div>"
 +re
-+(p.smpProj&&smpRe?"<div class=\"flex fac fjb mb2 mt3\"><strong class=\"ct\">&#9203; Letzte Stempeluhr-Eintr\u00e4ge</strong><button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"pz\">Alle</button></div>"+smpRe:"")
++(smpRe?"<div class=\"flex fac fjb mb2 mt3\"><strong class=\"ct\">&#9203; Letzte Stempeluhr-Eintr\u00e4ge</strong><button class=\"btn btn-g btn-sm\" data-action=\"nav\" data-id=\"pz\">Alle</button></div>"+smpRe:"")
 +"</div></div></div>";
 }
 function vPZ(){
 var p=curP();if(!p)return "<div class=\"page\"><p class=\"cm txs\">Kein aktives Projekt.</p></div>";
-var smpProj=p.smpProj||p.name||'';var smpEntries=smpProj?getSMPTime(smpProj):[];if(smpEntries.length===0&&p.name&&p.name!==smpProj){smpEntries=getSMPTime(p.name);}if(smpEntries.length===0){smpEntries=getSMPTime(p.id||'')||[];}
+var smpEntries=getSMPTimeForProject(p);
 smpEntries.sort(function(a,b){return b.date>a.date?1:-1;});
 var totH=0,totPay=0;
 for(var i=0;i<smpEntries.length;i++){totH+=(smpEntries[i].dur||0)/3600000;totPay+=parseFloat(smpEntries[i].pay)||0;}
@@ -1073,6 +1251,10 @@ for(var i=0;i<PST.length;i++){var ps=PST[i];fb+="<span class=\"badge "+ps.c+"\" 
 +"<input id=\"PSRCH\" class=\"fi\" style=\"width:200px\" placeholder=\"Suche...\" value=\""+APP.ps+"\">"
 +"<div class=\"flex g2p fac\"><span class=\"txs cm\">"+teile.length+" Teile &bull; "+FMT(totK)+"</span>"
 +"<button class=\"btn btn-p\" data-action=\"openTM\">+ Ersatzteil</button></div></div>"
++(function(){var rp=remPartsForProject(p);if(!rp.count)return"";return "<div class=\"card mb3\" style=\"padding:10px\"><div class=\"flex fac fjb\" style=\"flex-wrap:wrap;gap:8px\">"
++"<span class=\"tsm\">&#128230; Noch offen bis Endmontage: <strong>"+rp.count+"</strong> Teile &bull; <strong>"+FMT(rp.cost)+"</strong></span>"
++"<span class=\"txs cm\">"+(rp.projectedReadyDate?"voraussichtlich vollständig da: "+FMTD(rp.projectedReadyDate):(rp.unknownLead?"Lieferzeit für einzelne Teile unbekannt":"—"))+"</span>"
++"</div></div>";})()
 +"<div class=\"card mb3\" style=\"padding:10px\"><div style=\"display:flex;flex-wrap:wrap;gap:5px\">"+fb+"</div></div>"
 +(rows?"<div class=\"twrap\"><table><thead><tr><th>Bezeichnung</th><th>Menge</th><th>Status</th><th>Lieferant</th><th>Kosten</th><th></th></tr></thead>"
 +"<tbody>"+rows+"</tbody><tfoot><tr style=\"background:var(--bg)\"><td colspan=\"4\" class=\"txs cm\">Gesamt</td><td style=\"text-align:right;font-weight:600;color:var(--red)\">"+FMT(totK)+"</td><td></td></tr></tfoot></table></div>"
@@ -1201,8 +1383,11 @@ div.innerHTML='<div style="position:sticky;top:0;background:#1a1715;padding:10px
 document.body.appendChild(div);
 }
 var KZ_UNLOCKED=false;
-function navKZ(){
-if(KZ_UNLOCKED){nav("kennzahlen");return;}
+var KZ_TARGET="kennzahlen";
+function navScenario(){navKZ("scenario");}
+function navKZ(target){
+KZ_TARGET=target||"kennzahlen";
+if(KZ_UNLOCKED){nav(KZ_TARGET);return;}
 var ov=document.createElement("div");ov.id="KZ-PIN-OVL";
 ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:5000;display:flex;align-items:center;justify-content:center";
 ov.innerHTML='<div style="background:#fff;border-radius:12px;padding:28px 24px;width:300px;text-align:center">'
@@ -1221,7 +1406,7 @@ setTimeout(function(){var i=document.getElementById("kz-pin-inp");if(i){i.focus(
 function closeKZPin(){var o=document.getElementById("KZ-PIN-OVL");if(o)o.remove();}
 function checkKZPin(){
 var inp=document.getElementById("kz-pin-inp"),err=document.getElementById("kz-pin-err");if(!inp)return;
-if(inp.value.trim()===(D().settings.kpPin||"0000")){KZ_UNLOCKED=true;closeKZPin();nav("kennzahlen");toast("Entsperrt \u2713","ok");}
+if(inp.value.trim()===(D().settings.kpPin||"0000")){KZ_UNLOCKED=true;closeKZPin();nav(KZ_TARGET);toast("Entsperrt \u2713","ok");}
 else{if(err){err.textContent="\u274c Falscher PIN";setTimeout(function(){err.textContent="";},2000);}inp.value="";inp.focus();}
 }
 function closeKZPrint(){var el=document.getElementById("KZ-PRINT");if(el)el.remove();}
@@ -1350,7 +1535,7 @@ return "<div class=\"flex fac fjb\" style=\"padding:8px 12px;background:var(--bg
 function renderRepAnalyse(){
 var projId=GV("rep-proj"),type=GV("rep-type"),el=E("rep-result");if(!el)return;
 var entries=[];
-if(projId){var p=getP(projId);if(p){entries=getSMPTime(p.smpProj||p.name).slice();for(var i=0;i<p.tagebuch.length;i++){var tb=p.tagebuch[i];if(tb.zeit>0)entries.push({date:tb.datum,dur:tb.zeit*3600000,pay:tb.zeit*(p.ss||90),proj:p.name,note:tb.info,_isCR:true});}}}
+if(projId){var p=getP(projId);if(p){entries=getSMPTimeForProject(p).slice();for(var i=0;i<p.tagebuch.length;i++){var tb=p.tagebuch[i];if(tb.zeit>0)entries.push({date:tb.datum,dur:tb.zeit*3600000,pay:tb.zeit*(p.ss||90),proj:p.name,note:tb.info,_isCR:true});}}}
 else{entries=APP.smp.zeit.slice();var d2=D();for(var pi=0;pi<d2.projects.length;pi++){var proj=d2.projects[pi];for(var i=0;i<proj.tagebuch.length;i++){var tb2=proj.tagebuch[i];if(tb2.zeit>0)entries.push({date:tb2.datum,dur:tb2.zeit*3600000,pay:tb2.zeit*(proj.ss||90),proj:proj.name,note:tb2.info,_isCR:true});}}}
 if(!entries.length){el.innerHTML='<div class="empty"><p>Keine Daten.</p></div>';return;}
 var groups={};
@@ -1415,7 +1600,8 @@ for(var i=0;i<d.mitarbeiter.length;i++){var ma=d.mitarbeiter[i];
 maRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)\">"
 +"<span style=\"flex:1;font-size:13px\">"+ma.name+"</span>"
 +"<span class=\"txs cm\" style=\"margin-right:8px\">"+ma.rolle+"</span>"
-+"<button class=\"bic\" onclick=\"delMA("+i+")\">&#128465;</button></div>";}
++"<span class=\"badge b-blue\" style=\"margin-right:8px\">"+(ma.wochenkapazitaet>0?ma.wochenkapazitaet+"h/Wo":"Kapazität unbekannt")+"</span>"
++"<button class=\"bic\" onclick=\"delMACR("+i+")\">&#128465;</button></div>";}
 return "<div class=\"page\"><div class=\"pt mb3\">Stammdaten &amp; Einstellungen</div>"
 +"<div class=\"card mb3\"><div class=\"flex fac fjb mb3\"><span class=\"fw tsm\">&#127968; Mandant</span>"
 +"<span class=\"badge b-red\">"+MANDANT+"</span></div>"
@@ -1461,9 +1647,14 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<button class=\"btn btn-p btn-sm\" onclick=\"addAG()\">+ Arbeitsgang</button></div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128101; Mitarbeiter</div>"
 +(maRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+maRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Mitarbeiter.</p>")
-+"<div class=\"frow mb2\"><div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ma-rolle\"></div></div>"
-+"<button class=\"btn btn-p btn-sm\" onclick=\"addMA()\">+ Mitarbeiter</button></div>"
++"<div class=\"frow3 mb2\"><div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ma-rolle\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Wochenkapazität (h)</label><input class=\"fi\" type=\"number\" id=\"ma-kap\" placeholder=\"z.B. 38\" min=\"0\"></div></div>"
++"<button class=\"btn btn-p btn-sm\" onclick=\"addMACR()\">+ Mitarbeiter</button></div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#127981; Werkstatt-Ressourcen</div>"
++"<div class=\"txs cm mb2\">Anzahl paralleler Plätze/Bühnen für die Kapazitätsprüfung in der Fertigungsplanung.</div>"
++"<div class=\"fg\"><label class=\"fl\">Werkstattplätze</label><input type=\"number\" class=\"fi\" id=\"wr-plaetze\" min=\"0\" value=\""+(d.settings.werkstattPlaetze||"")+"\"></div>"
++"<button class=\"btn btn-p btn-sm\" onclick=\"saveWR()\">Speichern</button></div>"
 +"<div class=\"card mb3\"><div class=\"flex fac fjb mb2\"><span class=\"fw tsm\">&#128190; Speicher-Verwaltung</span>"
 +"<span id=\"stor-size\" class=\"txs cm\">...</span></div>"
 +"<div class=\"flex g2p\"><button class=\"btn btn-g btn-sm\" onclick=\"checkStorageUsage()\">Prüfen</button>"
@@ -1474,6 +1665,7 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<input type=\"file\" accept=\".json\" style=\"display:none\" onchange=\"doImport(event)\"></label>"
 +"</div></div>";
 }
+function saveWR(){var d=D();d.settings.werkstattPlaetze=GI("wr-plaetze")||0;saveData();render();toast("Werkstatt-Ressourcen gespeichert ✓","ok");}
 function saveBK(){var d=D();d.settings.miete=parseFloat((document.getElementById('bk-miete')||{value:'0'}).value)||0;d.settings.strom=parseFloat((document.getElementById('bk-strom')||{value:'0'}).value)||0;d.settings.agk=parseFloat((document.getElementById('bk-agk')||{value:'0'}).value)||0;d.settings.personal=parseFloat((document.getElementById('bk-personal')||{value:'0'}).value)||0;var _bk=(+(d.settings.miete))+(+(d.settings.strom))+(+(d.settings.agk))+(+(d.settings.personal));saveData();render();toast('BK: '+_bk.toFixed(2)+'\u20ac/h | Ertrag: '+(d.settings.ss-_bk).toFixed(2)+'\u20ac/h \u2713','ok');}
 function openM(h,lg){
 E("MOD").innerHTML="<div class=\"movl\" id=\"MOVL\"><div class=\"modal"+(lg?" modal-lg":"")+"\" id=\"MBOX\">"+h+"</div></div>";
@@ -1610,16 +1802,24 @@ var d=D(),p=id?getP(id):null;
 var vopt=d.vehicles.map(function(v){return "<option value=\""+v.id+"\""+(p&&p.vid===v.id?" selected":"")+">"+v.marke+" "+v.modell+" ("+v.baujahr+")</option>";}).join("");
 var sopt=PJST.map(function(s){return "<option"+(p&&p.status===s?" selected":"")+">"+s+"</option>";}).join("");
 var smpOpts=buildProjOpts(p?p.smpProj:"");
+var art=p&&p.art?p.art:"kunde";
 openM(MH(p?"Projekt bearbeiten":"Neues Projekt")
 +"<div class=\"mb2\">"
 +"<div class=\"fg\"><label class=\"fl\">Name *</label><input class=\"fi\" id=\"pm-n\" value=\""+(p?p.name:"")+"\"></div>"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Fahrzeug</label><select class=\"fsel\" id=\"pm-v\">"+vopt+"</select></div>"
 +"<div class=\"fg\"><label class=\"fl\">Status</label><select class=\"fsel\" id=\"pm-s\">"+sopt+"</select></div></div>"
++"<div class=\"fg\"><label class=\"fl\">Art des Projekts</label><select class=\"fsel\" id=\"pm-art\" onchange=\"togPMArt()\">"
++"<option value=\"kunde\""+(art==="kunde"?" selected":"")+">Kundenprojekt</option>"
++"<option value=\"intern\""+(art==="intern"?" selected":"")+">Intern (Eigenbestand/Wiederverkauf)</option></select></div>"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Start</label><input class=\"fi\" type=\"date\" id=\"pm-sd\" value=\""+(p?p.start:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Ziel</label><input class=\"fi\" type=\"date\" id=\"pm-ed\" value=\""+(p?p.ende:"")+"\"></div></div>"
 +"<div class=\"frow3\"><div class=\"fg\"><label class=\"fl\">Plankosten (&euro;)</label><input class=\"fi\" type=\"number\" id=\"pm-pk\" value=\""+(p?p.planK:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Planzeit (h)</label><input class=\"fi\" type=\"number\" id=\"pm-pz\" value=\""+(p?p.planZ:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Stundensatz</label><input class=\"fi\" type=\"number\" id=\"pm-ss\" value=\""+(p?p.ss:d.settings.ss||90)+"\"></div></div>"
++"<div id=\"pm-intern-fields\" style=\"display:"+(art==="intern"?"block":"none")+"\">"
++"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Kaufpreis Fahrzeug (&euro;)</label><input class=\"fi\" type=\"number\" id=\"pm-kp\" value=\""+(p&&p.kaufpreis?p.kaufpreis:"")+"\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Ziel-Verkaufspreis (&euro;)</label><input class=\"fi\" type=\"number\" id=\"pm-zvk\" value=\""+(p&&p.zielVK?p.zielVK:"")+"\"></div></div>"
++"</div>"
 +"<div class=\"fg\">"
 +"<label class=\"fl\">&#9203; SMP Stempeluhr-Projekt verknüpfen</label>"
 +"<select class=\"fsel\" id=\"pm-smp\">"+smpOpts+"</select>"
@@ -1629,9 +1829,10 @@ openM(MH(p?"Projekt bearbeiten":"Neues Projekt")
 +"</div>"
 +MF("saveP",id||""));
 }
+function togPMArt(){var f=E("pm-intern-fields");if(f)f.style.display=GV("pm-art")==="intern"?"block":"none";}
 function saveP(id){
 var d=D();
-var data={name:GV("pm-n"),vid:GV("pm-v"),status:GV("pm-s"),start:GV("pm-sd"),ende:GV("pm-ed"),planK:GF("pm-pk"),planZ:GF("pm-pz"),ss:GF("pm-ss"),smpProj:GV("pm-smp"),info:GV("pm-i")};
+var data={name:GV("pm-n"),vid:GV("pm-v"),status:GV("pm-s"),art:GV("pm-art")||"kunde",start:GV("pm-sd"),ende:GV("pm-ed"),planK:GF("pm-pk"),planZ:GF("pm-pz"),ss:GF("pm-ss"),kaufpreis:GF("pm-kp"),zielVK:GF("pm-zvk"),smpProj:GV("pm-smp"),info:GV("pm-i")};
 if(!data.name){toast("Name fehlt.","err");return;}
 if(id){var p=getP(id);for(var k in data)p[k]=data[k];}
 else{data.id=uid();data.gruppen=[];data.demontage=[];data.teile=[];data.tagebuch=[];d.projects.push(data);}
@@ -1647,16 +1848,33 @@ openM(MH("Kosten aktualisieren")+"<div class=\"mb2\">"
 +MF("saveUC",id));
 }
 function saveUC(id){var p=getP(id);var ss=GF("uc-ss");var pk=GF("uc-pk");var pz=GF("uc-pz");if(ss)p.ss=ss;if(pk)p.planK=pk;if(pz)p.planZ=pz;saveData();closeM();render();toast("Aktualisiert \u2713");}
+// Multi-select pill group for Mitarbeiter-Zuordnung (Baugruppen/Aufgaben), reused by openGM/openIM.
+function buildMAPills(selIds,prefix){
+var list=(D().mitarbeiter||[]);
+if(!list.length)return"<div class=\"txs cm\">Keine Mitarbeiter angelegt (siehe Stammdaten).</div>";
+return list.map(function(m){var sel=selIds.indexOf(m.id)>=0;return "<div class=\"pill"+(sel?" sel":"")+"\" data-action=\"togMAPill\" data-id=\""+prefix+"\" data-id2=\""+m.id+"\">"+esc(m.name)+"</div>";}).join("");
+}
+function togMAPill(prefix,maId){
+var hid=E(prefix+"-ma");if(!hid)return;
+var ids=hid.value?hid.value.split(","):[];
+var idx=ids.indexOf(maId);
+if(idx>=0)ids.splice(idx,1);else ids.push(maId);
+hid.value=ids.join(",");
+var wrap=E(prefix+"-mapg");if(wrap){var pills=wrap.querySelectorAll(".pill");for(var i=0;i<pills.length;i++)pills[i].classList.toggle("sel",ids.indexOf(pills[i].getAttribute("data-id2"))>=0);}
+}
+function GMulti(id){var el=E(id);return el&&el.value?el.value.split(",").filter(function(x){return x;}):[];}
 function openGM(id){
 var p=curP(),g=id?p.gruppen.filter(function(x){return x.id===id;})[0]:null;
+var gma=g&&g.ma?g.ma:[];
 openM(MH(g?"Gruppe bearbeiten":"Neue Gruppe")+"<div class=\"mb2\">"
 +"<div class=\"fg\"><label class=\"fl\">Name *</label><input class=\"fi\" id=\"gm-n\" value=\""+(g?g.name:"")+"\"></div>"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Plankosten</label><input class=\"fi\" type=\"number\" id=\"gm-pk\" value=\""+(g?g.planK:"")+"\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">Planzeit</label><input class=\"fi\" type=\"number\" id=\"gm-pz\" value=\""+(g?g.planZ:"")+"\"></div></div></div>"
++"<div class=\"fg\"><label class=\"fl\">Planzeit</label><input class=\"fi\" type=\"number\" id=\"gm-pz\" value=\""+(g?g.planZ:"")+"\"></div></div>"
++"<div class=\"fg\"><label class=\"fl\">Zust\u00e4ndige Mitarbeiter</label><div class=\"pillg\" id=\"gm-mapg\">"+buildMAPills(gma,"gm")+"</div><input type=\"hidden\" id=\"gm-ma\" value=\""+gma.join(",")+"\"></div></div>"
 +MF("saveG",id||""));
 }
 function saveG(id){
-var p=curP();var data={name:GV("gm-n"),planK:GF("gm-pk"),planZ:GF("gm-pz")};
+var p=curP();var data={name:GV("gm-n"),planK:GF("gm-pk"),planZ:GF("gm-pz"),ma:GMulti("gm-ma")};
 if(!data.name){toast("Name fehlt.","err");return;}
 if(id){var g=p.gruppen.filter(function(x){return x.id===id;})[0];for(var k in data)g[k]=data[k];}
 else{data.id=uid();data.col=false;data.items=[];p.gruppen.push(data);}
@@ -1670,6 +1888,7 @@ function openIM(gid,iid){
 var p=curP(),g=p.gruppen.filter(function(x){return x.id===gid;})[0];
 var it=iid?g.items.filter(function(x){return x.id===iid;})[0]:null;
 var sopt=PLST.map(function(s){return "<option"+(it&&it.status===s?" selected":"")+">"+s+"</option>";}).join("");
+var ima=it&&it.ma?it.ma:[];
 openM(MH(it?"Punkt bearbeiten":"Neuer Punkt")+"<div class=\"mb2\">"
 +"<div class=\"fg\"><label class=\"fl\">Bezeichnung *</label><input class=\"fi\" id=\"im-n\" value=\""+(it?it.name:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Zustand</label><input class=\"fi\" id=\"im-z\" value=\""+(it?it.zustand:"")+"\"></div>"
@@ -1678,12 +1897,13 @@ openM(MH(it?"Punkt bearbeiten":"Neuer Punkt")+"<div class=\"mb2\">"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Ist-Kosten</label><input class=\"fi\" type=\"number\" id=\"im-ik\" value=\""+(it?it.istK:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Ist-Zeit</label><input class=\"fi\" type=\"number\" id=\"im-iz\" value=\""+(it?it.istZ:"")+"\"></div></div>"
 +"<div class=\"fg\"><label class=\"fl\">Status</label><select class=\"fsel\" id=\"im-s\">"+sopt+"</select></div>"
++"<div class=\"fg\"><label class=\"fl\">Zust\u00e4ndige Mitarbeiter <span class=\"txs cm\">(leer = wie Baugruppe)</span></label><div class=\"pillg\" id=\"im-mapg\">"+buildMAPills(ima,"im")+"</div><input type=\"hidden\" id=\"im-ma\" value=\""+ima.join(",")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Bemerkungen</label><textarea class=\"fta\" id=\"im-b\" style=\"min-height:55px\">"+(it?it.bem:"")+"</textarea></div></div>"
 +MF("saveI",gid,iid||""));
 }
 function saveI(gid,iid){
 var p=curP(),g=p.gruppen.filter(function(x){return x.id===gid;})[0];
-var data={name:GV("im-n"),zustand:GV("im-z"),planK:GF("im-pk"),planZ:GF("im-pz"),istK:GF("im-ik"),istZ:GF("im-iz"),status:GV("im-s"),bem:GV("im-b")};
+var data={name:GV("im-n"),zustand:GV("im-z"),planK:GF("im-pk"),planZ:GF("im-pz"),istK:GF("im-ik"),istZ:GF("im-iz"),status:GV("im-s"),bem:GV("im-b"),ma:GMulti("im-ma")};
 if(!data.name){toast("Name fehlt.","err");return;}
 if(iid){var it=g.items.filter(function(x){return x.id===iid;})[0];for(var k in data)it[k]=data[k];}
 else{data.id=uid();g.items.push(data);}
@@ -1736,12 +1956,14 @@ openM(MH(t?"Ersatzteil bearbeiten":"Neues Ersatzteil")
 +"<div class=\"fg\"><label class=\"fl\">EK (Einkauf)</label><input class=\"fi\" type=\"number\" id=\"tm-ek\" value=\""+(t&&t.ek?t.ek:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">VK (Verkauf)</label><input class=\"fi\" type=\"number\" id=\"tm-ko\" value=\""+(t?t.kosten:"")+"\"></div></div>"
 +"<div class=\"fg\"><label class=\"fl\">Lieferant</label><input class=\"fi\" id=\"tm-li\" value=\""+(t?t.lief:"")+"\"></div>"
++"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Bestelldatum</label><input class=\"fi\" type=\"date\" id=\"tm-bd\" value=\""+(t?t.bestelldatum||"":"")+"\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Lieferzeit (Tage)</label><input class=\"fi\" type=\"number\" id=\"tm-lz\" min=\"0\" value=\""+(t&&t.lieferzeitTage?t.lieferzeitTage:"")+"\"></div></div>"
 +"<div class=\"fg\"><label class=\"fl\">Notizen</label><textarea class=\"fta\" id=\"tm-no\">"+(t?t.notiz:"")+"</textarea></div></div>"
 +MF("saveT",id||""),true);
 }
 function selPS(val){E("tm-st").value=val;var pills=E("tm-spg").querySelectorAll(".pill");for(var i=0;i<pills.length;i++)pills[i].classList.toggle("sel",pills[i].getAttribute("data-id")===val);}
 function saveT(id){
-var p=curP();var data={nr:GV("tm-nr"),gr:GV("tm-gr"),name:GV("tm-n"),status:GV("tm-st"),menge:GI("tm-me")||1,ek:GF("tm-ek"),kosten:GF("tm-ko"),lief:GV("tm-li"),notiz:GV("tm-no")};
+var p=curP();var data={nr:GV("tm-nr"),gr:GV("tm-gr"),name:GV("tm-n"),status:GV("tm-st"),menge:GI("tm-me")||1,ek:GF("tm-ek"),kosten:GF("tm-ko"),lief:GV("tm-li"),notiz:GV("tm-no"),bestelldatum:GV("tm-bd"),lieferzeitTage:GI("tm-lz")};
 if(!data.name){toast("Name fehlt.","err");return;}
 if(id){var t=p.teile.filter(function(x){return x.id===id;})[0];for(var k in data)t[k]=data[k];}
 else{data.id=uid();data.bilder=[];p.teile.push(data);}
@@ -1783,8 +2005,7 @@ var p=getP(pid);if(!p)return;
 var v=getV(p.vid),c=costs(p);
 var gruppen=p.gruppen||[],teile=p.teile||[];
 var tagebuch=p.tagebuch||[],demontage=p.demontage||[];
-var smpKey=p.smpProj||p.name;
-var smpEntries=smpKey?getSMPTime(smpKey):[];
+var smpEntries=getSMPTimeForProject(p);
 smpEntries.sort(function(a,b){return(a.date||"").localeCompare(b.date||"");});
 var ov=document.getElementById("REP-OVERLAY");if(ov)ov.remove();
 ov=document.createElement("div");ov.id="REP-OVERLAY";
@@ -1961,6 +2182,7 @@ else if(a==="openDM")openDM(id);else if(a==="delD")delD(id);
 else if(a==="openTM")openTM(id);else if(a==="delT")delT(id);
 else if(a==="openBM")openBM(id);else if(a==="delB")delB(id);
 else if(a==="selPS")selPS(id);
+else if(a==="togMAPill")togMAPill(id,id2);
 else if(a==="fParts"){APP.pf=id;render();}
 else if(a==="lbox")lbox(id);
 else if(a==="closeM")closeM();
@@ -3324,6 +3546,21 @@ if(!confirm('Mitarbeiter löschen?'))return;
 DB.mitarbeiter.splice(i,1);saveDB();
 var pg=document.getElementById('pg');if(pg&&TAB==='stamm')pg.innerHTML=rStamm();
 }
+// CR-side Mitarbeiterstamm (APP.data.mitarbeiter) — separate from the SMP-side addMA()/delMA() above,
+// which write to APP.smp.mitarbeiter. Needed so employees can actually be assigned to Baugruppen/Aufgaben.
+function addMACR(){
+var d=D();
+if(!d.mitarbeiter)d.mitarbeiter=[];
+var name=GV('ma-name').trim(),rolle=GV('ma-rolle').trim(),kap=GF('ma-kap');
+if(!name){alert('Bitte Name eingeben.');return;}
+for(var i=0;i<d.mitarbeiter.length;i++) if(d.mitarbeiter[i].name===name){alert('Mitarbeiter bereits vorhanden.');return;}
+d.mitarbeiter.push({id:uid(),name:name,rolle:rolle,rate:0,tel:'',wochenkapazitaet:kap||0});
+saveData();render();
+}
+function delMACR(i){
+if(!confirm('Mitarbeiter löschen?'))return;
+D().mitarbeiter.splice(i,1);saveData();render();
+}
 function toggleDash(id){
 DASH_OPEN[id] = (DASH_OPEN[id] === false) ? true : false;
 render();
@@ -3420,8 +3657,9 @@ byKunde[kunde].dur+=dur; byKunde[kunde].pay+=pay; byKunde[kunde].cnt++;
 var pname=e.proj||'---';
 if(!byProj[pname]){byProj[pname]={dur:0,pay:0,cnt:0,kunde:kunde};}
 byProj[pname].dur+=dur; byProj[pname].pay+=pay; byProj[pname].cnt++;
-var ma='Unbekannt';
-if(e.note){var mm=e.note.match(/\[([^\]]+)\]$/);if(mm)ma=mm[1].trim();}
+var ma=e.ma||'';
+if(!ma&&e.note){var mm=e.note.match(/\[([^\]]+)\]$/);if(mm)ma=mm[1].trim();}
+if(!ma)ma='Unbekannt';
 if(!byMA[ma]){byMA[ma]={dur:0,pay:0,cnt:0};}
 byMA[ma].dur+=dur; byMA[ma].pay+=pay; byMA[ma].cnt++;
 var mo=(e.date||'').slice(0,7);
@@ -3687,7 +3925,7 @@ DB.zeit.push({
 id:uid(), date:new Date().toISOString().slice(0,10),
 start:new Date(stampStart).toISOString(),
 end:new Date(end).toISOString(),
-dur:dur, rate:rate, pay:pay, proj:proj, note:note
+dur:dur, rate:rate, pay:pay, proj:proj, note:note, pid:matchProjectId(proj), ma:ma
 });
 saveDB();
 stampStart=null; stampPause=null; pauseTotal=0;
@@ -3713,7 +3951,7 @@ if(endDt<=startDt) return;
 var dur=(endDt-startDt)-(pause*60000);
 if(dur<0) dur=0;
 var pay=calcPay(dur,rate);
-DB.zeit.push({id:uid(),date:d,start:startDt.toISOString(),end:endDt.toISOString(),dur:dur,rate:rate,pay:pay,proj:proj,note:note,pause:pause});
+DB.zeit.push({id:uid(),date:d,start:startDt.toISOString(),end:endDt.toISOString(),dur:dur,rate:rate,pay:pay,proj:proj,note:note,pause:pause,pid:matchProjectId(proj),ma:zma});
 saveDB();nav('zeitliste');
 }
 function syncTaskNote(selId, noteId){
