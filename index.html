@@ -570,17 +570,21 @@ var c=costs(p);
 var byMA=remHoursByMA(p),remH=0;for(var k in byMA)remH+=byMA[k];
 var maById={};(D().mitarbeiter||[]).forEach(function(m){maById[m.id]=m;});
 var bk=betriebskostenProStunde();
-var remHoursCost=0,unknownRateHours=0;
+// Lohnkosten und Betriebskosten-Zuschlag bewusst getrennt gehalten (nicht je MA verrechnet),
+// damit der reine Personaleinsatz je Mitarbeiter nicht durch den Gemeinkosten-Anteil verwässert wird.
+var remWageCost=0,unknownRateHours=0;
 for(var mid in byMA){
 var m=maById[mid];
 var wage=(m&&m.rate>0)?m.rate:0;
 if(!wage)unknownRateHours+=byMA[mid];
-remHoursCost+=byMA[mid]*(wage+bk);
+remWageCost+=byMA[mid]*wage;
 }
+var remOverheadCost=remH*bk;
+var remHoursCost=remWageCost+remOverheadCost;
 var remParts=remPartsForProject(p);
 var alreadySpent=c.pkEK+c.tk;
 var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remHoursCost;
-var res={remHours:remH,remHoursByMA:byMA,remHoursCost:remHoursCost,unknownRateHours:unknownRateHours,betriebskostenProStunde:bk,remParts:remParts,alreadySpent:alreadySpent,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
+var res={remHours:remH,remHoursByMA:byMA,remWageCost:remWageCost,remOverheadCost:remOverheadCost,remHoursCost:remHoursCost,unknownRateHours:unknownRateHours,betriebskostenProStunde:bk,remParts:remParts,alreadySpent:alreadySpent,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
 if(p.art==="intern"){
 res.zielVK=p.zielVK||0;
 res.margin=res.zielVK-totalCostToComplete;
@@ -881,16 +885,17 @@ var d=D(),sc=scenarioCalc(p);
 var maById={};for(var i=0;i<(d.mitarbeiter||[]).length;i++)maById[d.mitarbeiter[i].id]=d.mitarbeiter[i];
 var maRows=Object.keys(sc.remHoursByMA).map(function(mid){
 var m=maById[mid],wage=(m&&m.rate>0)?m.rate:0;
-var eff=wage+sc.betriebskostenProStunde;
-var rateTxt=wage?(eff+"&euro;/h"):"kein Satz hinterlegt";
+var rateTxt=wage?(wage+"&euro;/h"):"kein Satz hinterlegt";
 return "<div class=\"flex fac fjb tsm\" style=\"padding:4px 0\"><span>"+esc((m&&m.name)||"?")+"</span><span class=\""+(wage?"":"cr")+"\">"+FMTH(sc.remHoursByMA[mid])+" &times; "+rateTxt+"</span></div>";
 }).join("")||"<p class=\"txs cm\">Keine Mitarbeiter zugeordnet.</p>";
 var partsRows=sc.remParts.teile.map(function(t){return "<tr><td>"+esc(t.name)+"</td><td>"+psb(t.status)+"</td><td>"+FMT(t.ek>0?t.ek:t.kosten||0)+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("");
 var html="<div class=\"g2\"><div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Reststunden je Mitarbeiter</div>"
-+"<div class=\"txs cm mb2\">Je Std.: echter MA-Satz + Betriebskosten (Miete/Strom/Allg. Kosten: "+FMT(sc.betriebskostenProStunde)+"/h)</div>"
++"<div class=\"txs cm mb2\">Reiner Personaleinsatz zum echten internen Stundensatz — Betriebskosten separat unten.</div>"
 +maRows
-+(sc.unknownRateHours>0?"<div class=\"txs cr mt2\">&#9888; "+FMTH(sc.unknownRateHours)+" ohne hinterlegten Stundensatz — nur Betriebskosten eingerechnet, Lohnkosten fehlen (siehe Einstellungen).</div>":"")
++(sc.unknownRateHours>0?"<div class=\"txs cr mt2\">&#9888; "+FMTH(sc.unknownRateHours)+" ohne hinterlegten Stundensatz — dafür fehlen die Lohnkosten in der Summe (siehe Einstellungen).</div>":"")
++"<div class=\"divid\"></div><div class=\"flex fjb tsm\"><span>Lohnkosten Reststunden</span><span>"+FMT(sc.remWageCost)+"</span></div>"
++"<div class=\"flex fjb tsm\"><span>Betriebskosten-Zuschlag ("+FMTH(sc.remHours)+" &times; "+FMT(sc.betriebskostenProStunde)+"/h)</span><span>"+FMT(sc.remOverheadCost)+"</span></div>"
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.remHours)+")</span><span>"+FMT(sc.remHoursCost)+"</span></div></div>"
 +"<div class=\"card\"><div class=\"fw tsm mb3\">Offene Ersatzteile ("+sc.remParts.count+")</div>"
 +(partsRows?"<div class=\"twrap\"><table><thead><tr><th>Teil</th><th>Status</th><th>Kosten</th><th>Lieferzeit</th></tr></thead><tbody>"+partsRows+"</tbody></table></div>":"<p class=\"txs cm\">Keine offenen Teile.</p>")
@@ -903,7 +908,8 @@ var html="<div class=\"g2\"><div>"
 +"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Kaufpreis Fahrzeug</span><span>"+FMT(sc.kaufpreis)+"</span></div>"
 +"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Bereits investiert (Teile+Zeit)</span><span>"+FMT(sc.alreadySpent)+"</span></div>"
 +"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Ersatzteile</span><span>"+FMT(sc.remParts.cost)+"</span></div>"
-+"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Arbeitszeit</span><span>"+FMT(sc.remHoursCost)+"</span></div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Arbeitszeit (Lohn)</span><span>"+FMT(sc.remWageCost)+"</span></div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Arbeitszeit (Betriebskosten)</span><span>"+FMT(sc.remOverheadCost)+"</span></div>"
 +"<div class=\"divid\"></div><div class=\"flex fjb\" style=\"font-size:14px\"><strong>Gesamtkosten bis fertig</strong><strong class=\"cr\">"+FMT(sc.totalCostToComplete)+"</strong></div>"
 +"</div>"
 +(p.art==="intern"?
