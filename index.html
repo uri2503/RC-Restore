@@ -70,7 +70,7 @@
 </aside>
 
 <main class="main" id="MC" style="padding:22px 26px">
-  <div style="color:var(--text3);font-size:14px">Wird geladen&hellip;</div>
+  <div style="color:var(--text3);font-size:14px">Verbinde mit Datenbank&hellip;</div>
 </main>
 </div>
 
@@ -1661,12 +1661,14 @@ agRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px soli
 +"<button class=\"bic\" onclick=\"delAG("+i+")\">&#128465;</button></div>";}
 var maRows="";
 for(var i=0;i<d.mitarbeiter.length;i++){var ma=d.mitarbeiter[i];
-maRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)\">"
+maRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)"+(MACR_EDIT_ID===ma.id?";background:var(--bg2)":"")+"\">"
 +"<span style=\"flex:1;font-size:13px\">"+ma.name+"</span>"
 +"<span class=\"txs cm\" style=\"margin-right:8px\">"+ma.rolle+"</span>"
 +"<span class=\"badge b-amber\" style=\"margin-right:8px\">"+(ma.rate>0?ma.rate+"€/h intern":"kein Satz")+"</span>"
 +"<span class=\"badge b-blue\" style=\"margin-right:8px\">"+(ma.wochenkapazitaet>0?ma.wochenkapazitaet+"h/Wo":"Kapazität unbekannt")+"</span>"
-+"<button class=\"bic\" onclick=\"delMACR("+i+")\">&#128465;</button></div>";}
++"<button class=\"bic\" style=\"margin-right:4px\" onclick=\"editMACR('"+ma.id+"')\">&#9998;</button>"
++"<button class=\"bic\" onclick=\"delMACR('"+ma.id+"')\">&#128465;</button></div>";}
+var macrEdit=MACR_EDIT_ID?d.mitarbeiter.filter(function(m){return m.id===MACR_EDIT_ID;})[0]:null;
 return "<div class=\"page\"><div class=\"pt mb3\">Stammdaten &amp; Einstellungen</div>"
 +"<div class=\"card mb3\"><div class=\"flex fac fjb mb3\"><span class=\"fw tsm\">&#127968; Mandant</span>"
 +"<span class=\"badge b-red\">"+MANDANT+"</span></div>"
@@ -1713,12 +1715,14 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128101; Mitarbeiter (Fertigungsplanung)</div>"
 +"<div class=\"txs cm mb2\">Diese Liste wird für die Baugruppen-/Aufgaben-Zuordnung in Fertigungsplanung &amp; Szenariorechner genutzt (separat vom „Mitarbeiterstamm“ unter Stammdaten).</div>"
 +(maRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+maRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Mitarbeiter.</p>")
-+"<div class=\"frow\" style=\"grid-template-columns:1fr 1fr\"><div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ma-rolle\"></div></div>"
-+"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Stundensatz intern (Lohnkosten, &euro;/h)</label><input class=\"fi\" type=\"number\" id=\"ma-satz\" placeholder=\"z.B. 28\" min=\"0\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">Wochenkapazität (h)</label><input class=\"fi\" type=\"number\" id=\"ma-kap\" placeholder=\"z.B. 38\" min=\"0\"></div></div>"
++(macrEdit?"<div class=\"txs\" style=\"color:var(--red);margin-bottom:8px\">Bearbeite: "+esc(macrEdit.name)+"</div>":"")
++"<div class=\"frow\" style=\"grid-template-columns:1fr 1fr\"><div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\" value=\""+(macrEdit?esc(macrEdit.name):"")+"\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ma-rolle\" value=\""+(macrEdit?esc(macrEdit.rolle||""):"")+"\"></div></div>"
++"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Stundensatz intern (Lohnkosten, &euro;/h)</label><input class=\"fi\" type=\"number\" id=\"ma-satz\" placeholder=\"z.B. 28\" min=\"0\" value=\""+(macrEdit&&macrEdit.rate?macrEdit.rate:"")+"\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Wochenkapazität (h)</label><input class=\"fi\" type=\"number\" id=\"ma-kap\" placeholder=\"z.B. 38\" min=\"0\" value=\""+(macrEdit&&macrEdit.wochenkapazitaet?macrEdit.wochenkapazitaet:"")+"\"></div></div>"
 +"<div class=\"txs cm mb2\">Wichtig: der interne Stundensatz ist die tatsächliche Lohnkostenschätzung des Mitarbeiters, nicht der Verkaufspreis für Kunden.</div>"
-+"<button class=\"btn btn-p btn-sm\" onclick=\"addMACR()\">+ Mitarbeiter</button></div>"
++"<div class=\"flex g2p\"><button class=\"btn btn-p btn-sm\" onclick=\"saveMACR()\">"+(macrEdit?"Änderungen speichern":"+ Mitarbeiter")+"</button>"
++(macrEdit?"<button class=\"btn btn-g btn-sm\" onclick=\"cancelMACREdit()\">Abbrechen</button>":"")+"</div></div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#127981; Werkstatt-Ressourcen</div>"
 +"<div class=\"txs cm mb2\">Anzahl paralleler Plätze je Bereich für die Kapazitätsprüfung in der Fertigungsplanung.</div>"
 +"<div class=\"frow\">"+WERKSTATT_TYPEN.map(function(wt){return "<div class=\"fg\"><label class=\"fl\">"+wt.label+"</label><input type=\"number\" class=\"fi\" id=\"wr-"+wt.key+"\" min=\"0\" value=\""+getWTCap(d,wt.key)+"\"></div>";}).join("")+"</div>"
@@ -3631,18 +3635,29 @@ var pg=document.getElementById('pg');if(pg&&APP.view==='stamm')pg.innerHTML=rSta
 }
 // CR-side Mitarbeiterstamm (APP.data.mitarbeiter) — separate from the SMP-side addMA()/delMA() above,
 // which write to APP.smp.mitarbeiter. Needed so employees can actually be assigned to Baugruppen/Aufgaben.
-function addMACR(){
+var MACR_EDIT_ID=null;
+function saveMACR(){
 var d=D();
 if(!d.mitarbeiter)d.mitarbeiter=[];
 var name=GV('ma-name').trim(),rolle=GV('ma-rolle').trim(),kap=GF('ma-kap'),satz=GF('ma-satz');
 if(!name){alert('Bitte Name eingeben.');return;}
-for(var i=0;i<d.mitarbeiter.length;i++) if(d.mitarbeiter[i].name===name){alert('Mitarbeiter bereits vorhanden.');return;}
+for(var i=0;i<d.mitarbeiter.length;i++) if(d.mitarbeiter[i].name===name&&d.mitarbeiter[i].id!==MACR_EDIT_ID){alert('Mitarbeiter bereits vorhanden.');return;}
+if(MACR_EDIT_ID){
+var ma=d.mitarbeiter.filter(function(m){return m.id===MACR_EDIT_ID;})[0];
+if(ma){ma.name=name;ma.rolle=rolle;ma.rate=satz||0;ma.wochenkapazitaet=kap||0;}
+MACR_EDIT_ID=null;
+}else{
 d.mitarbeiter.push({id:uid(),name:name,rolle:rolle,rate:satz||0,tel:'',wochenkapazitaet:kap||0});
+}
 saveData();render();
 }
-function delMACR(i){
+function editMACR(id){MACR_EDIT_ID=id;render();}
+function cancelMACREdit(){MACR_EDIT_ID=null;render();}
+function delMACR(id){
 if(!confirm('Mitarbeiter löschen?'))return;
-D().mitarbeiter.splice(i,1);saveData();render();
+var d=D();d.mitarbeiter=d.mitarbeiter.filter(function(m){return m.id!==id;});
+if(MACR_EDIT_ID===id)MACR_EDIT_ID=null;
+saveData();render();
 }
 function toggleDash(id){
 DASH_OPEN[id] = (DASH_OPEN[id] === false) ? true : false;
@@ -4268,12 +4283,20 @@ var _bootTimeout=setTimeout(function(){
   var mc=E("MC");if(mc)mc.innerHTML="<div class=\"page\"><p class=\"cm txs\">Verbindung zur Datenbank dauert ungewöhnlich lange. Bitte Internetverbindung prüfen und Seite neu laden.</p></div>";
 },10000);
 
-if(sbRestoreSession()){
+function bootWithSession(retried){
   sbEnsureRow(function(ok){
-    clearTimeout(_bootTimeout);
-    if(ok){ loadDataAsync(function(){ nav("dashboard"); }); }
-    else { initLogin(); }
+    if(ok){ clearTimeout(_bootTimeout); loadDataAsync(function(){ nav("dashboard"); }); }
+    else if(!retried){
+      // Transient network hiccup vs. a truly expired session look the same here — retry
+      // once before dropping to the login screen, so a brief blip doesn't force a re-login.
+      setTimeout(function(){ bootWithSession(true); }, 1500);
+    } else { clearTimeout(_bootTimeout); initLogin(); }
   });
+}
+
+if(sbRestoreSession()){
+  var mc0=E("MC");if(mc0)mc0.innerHTML="<div class=\"page\"><p class=\"cm txs\">Verbinde mit Datenbank…</p></div>";
+  bootWithSession(false);
 } else {
   clearTimeout(_bootTimeout);
   initLogin();
