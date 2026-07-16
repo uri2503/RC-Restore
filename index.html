@@ -131,8 +131,8 @@ var PST=[
 var PJST=["Aktiv","Planung","Pausiert","Abgeschlossen"];
 var PLST=["Geplant","In Arbeit","Fertig","Problem"];
 var BEREICHE=["Motor","Karosserie","Interieur","Fahrwerk","Elektrik","Getriebe","Auspuff","Achse","K\u00fchlsystem","Sonstiges"];
-var WERKSTATT_TYPEN=[{key:"hebebuehne",label:"Hebeb\u00fchne"},{key:"strahlbuehne",label:"Strahlb\u00fchne"},{key:"lackierbox",label:"Lackierbox"},{key:"vorbereitung",label:"Vorbereitungsplatz"}];
-var WERKSTATT_DEFAULT={hebebuehne:2,strahlbuehne:1,lackierbox:1,vorbereitung:2};
+var WERKSTATT_TYPEN=[{key:"hebebuehne",label:"Hebeb\u00fchne"},{key:"strahlbuehne",label:"Strahlb\u00fchne"},{key:"lackierbox",label:"Lackierbox"},{key:"vorbereitung",label:"Vorbereitungsplatz"},{key:"aussenplatz",label:"Au\u00dfenplatz"}];
+var WERKSTATT_DEFAULT={hebebuehne:2,strahlbuehne:1,lackierbox:1,vorbereitung:2,aussenplatz:0};
 function getWTCap(d,key){var v=d.settings.werkstattTypen;return(v&&v[key]!=null)?v[key]:WERKSTATT_DEFAULT[key];}
 var APP={view:"dashboard",pid:null,pf:"",ps:"",zFilter:"",zSearch:"",data:{
 vehicles:[
