@@ -635,6 +635,15 @@ if((t.lieferzeitTage||0)>maxLeadDays)maxLeadDays=t.lieferzeitTage;
 }
 return{count:teile.length,cost:cost,maxLeadDays:maxLeadDays,projectedReadyDate:projectedReadyDate?projectedReadyDate.toISOString().slice(0,10):null,unknownLead:unknownLead,teile:teile};
 }
+// Gegenstück zu remPartsForProject(): bereits verbaute/einbaubereite Teile (Status ab s6) — die
+// beiden Funktionen partitionieren p.teile vollständig, kein Teil zählt in beiden.
+function spentPartsForProject(p,opts){
+var cutoff=pstIndex((opts&&opts.uptoStatus)||"s5");
+var teile=p.teile.filter(function(t){return pstIndex(t.status)>cutoff;});
+var cost=0;
+for(var i=0;i<teile.length;i++){var t=teile[i];cost+=t.ek>0?partEK(t):partVK(t);}
+return{count:teile.length,cost:cost,teile:teile};
+}
 // MA/Werkstatt ohne konfigurierte Kapazität gelten als "unbekannt", nicht als überlastet.
 function capacityCheck(referenceDate){
 var d=D(),ref=referenceDate||new Date();
@@ -726,12 +735,10 @@ return{wageCost:wageCost,overheadCost:overheadCost,totalCost:wageCost+overheadCo
 // Arbeitszeit-Anteil kommt aus den Ist-Stunden je Aufgabe (wie remHoursByMA), nicht aus costs()'s
 // Tagebuch/SMP-Stunden — sonst würde bereits geleistete Arbeit hier unsichtbar bleiben.
 // Ersatzteile: c.pkEK ist die Summe ALLER Teile unabhängig vom Status; remPartsForProject() ist die
-// Summe der noch offenen (Status vor "Einbaubereit"). Die Differenz sind exakt die bereits
-// eingebauten/einbaubereiten Teile — "bereits investiert" und "noch offen" überschneiden sich dadurch
-// nie und ergeben zusammen immer wieder c.pkEK.
+// spentPartsForProject()/remPartsForProject() partitionieren p.teile vollständig nach Status, kein
+// Teil zählt in beiden — "bereits investiert" und "noch offen" überschneiden sich dadurch nie.
 function capitalTiedUp(p){
-var c=costs(p);
-var spentParts=c.pkEK-remPartsForProject(p).cost;
+var spentParts=spentPartsForProject(p).cost;
 var spentLabor=laborCostByMA(spentHoursByMA(p),totalSpentTaskHours(p));
 var ageDays=p.start?Math.floor((new Date()-new Date(p.start))/86400000):0;
 return{kaufpreis:p.kaufpreis||0,spentParts:spentParts,spentLabor:spentLabor.totalCost,capital:(p.kaufpreis||0)+spentParts+spentLabor.totalCost,ageDays:ageDays};
@@ -749,17 +756,15 @@ var spentLabor=laborCostByMA(spentByMA,totalSpentTaskHours(p));
 var smpSpent=spentSMPHoursByMA(p);
 var smpLabor=laborCostByMA(smpSpent.byMA);
 var remParts=remPartsForProject(p);
-// c.pkEK ist die Summe ALLER Teile unabhängig vom Status; remParts.cost nur die noch offenen
-// (Status vor "Einbaubereit"). Die Differenz sind die bereits eingebauten/einbaubereiten Teile —
-// so zählt kein Teil gleichzeitig als "bereits investiert" UND "noch offen".
-var alreadySpentParts=c.pkEK-remParts.cost;
+var spentParts=spentPartsForProject(p);
+var alreadySpentParts=spentParts.cost;
 var alreadySpent=alreadySpentParts+spentLabor.totalCost;
 var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remLabor.totalCost;
 var res={
 remHours:remLabor.overheadHours,remHoursByMA:remByMA,remWageCost:remLabor.wageCost,remOverheadCost:remLabor.overheadCost,remHoursCost:remLabor.totalCost,unknownRateHours:remLabor.unknownRateHours,remUnassignedHours:unassignedTaskHours(p,"rem"),
 spentHours:spentLabor.overheadHours,spentHoursByMA:spentByMA,spentWageCost:spentLabor.wageCost,spentOverheadCost:spentLabor.overheadCost,spentHoursCost:spentLabor.totalCost,spentUnknownRateHours:spentLabor.unknownRateHours,spentUnassignedHours:unassignedTaskHours(p,"spent"),
 smpSpentHours:smpLabor.totalHours,smpSpentHoursByMA:smpSpent.byMA,smpSpentCost:smpLabor.totalCost,smpSpentUnresolvedHours:smpSpent.unresolvedHours,
-betriebskostenProStunde:betriebskostenProStunde(),remParts:remParts,alreadySpent:alreadySpent,alreadySpentParts:alreadySpentParts,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
+betriebskostenProStunde:betriebskostenProStunde(),remParts:remParts,spentParts:spentParts,alreadySpent:alreadySpent,alreadySpentParts:alreadySpentParts,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
 if(p.art==="intern"){
 res.zielVK=p.zielVK||0;
 res.margin=res.zielVK-totalCostToComplete;
@@ -1097,6 +1102,7 @@ var remByMAGroup=hoursByMAAndGroup(p,"rem"),spentByMAGroup=hoursByMAAndGroup(p,"
 var maRows=maRowsFor(sc.remHoursByMA,remByMAGroup,"cr")||"<p class=\"txs cm\">Keine Mitarbeiter zugeordnet.</p>";
 var spentMaRows=maRowsFor(sc.spentHoursByMA,spentByMAGroup,"cr")||"<p class=\"txs cm\">Noch keine Ist-Stunden erfasst.</p>";
 var partsRows=sc.remParts.teile.map(function(t){return "<tr><td>"+esc(t.name)+"</td><td>"+psb(t.status)+"</td><td>"+FMT(t.ek>0?partEK(t):partVK(t))+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("");
+var spentPartsRows=sc.spentParts.teile.map(function(t){return "<tr><td>"+esc(t.name)+"</td><td>"+psb(t.status)+"</td><td>"+FMT(t.ek>0?partEK(t):partVK(t))+"</td></tr>";}).join("");
 var groups=groupBudgetProgress(p);
 var groupRows=groups.map(function(gr){
 var scale=Math.max(gr.planZ,gr.istZ,0.01);
@@ -1146,6 +1152,10 @@ var html=groupsSection+"<div class=\"g2\"><div>"
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Summe</span><span>"+FMT(sc.remParts.cost)+"</span></div>"
 +(sc.remParts.projectedReadyDate?"<div class=\"txs cm mt2\">Voraussichtlich vollständig da: "+FMTD(sc.remParts.projectedReadyDate)+"</div>":"")
 +(sc.remParts.unknownLead?"<div class=\"txs cm mt2\">&#9888; Für einzelne Teile ist keine Lieferzeit hinterlegt.</div>":"")
++"</div>"
++"<div class=\"card mt3\"><div class=\"fw tsm mb3\">&#9989; Verbaute Teile ("+sc.spentParts.count+")</div>"
++(spentPartsRows?"<div class=\"twrap\"><table><thead><tr><th>Teil</th><th>Status</th><th>Kosten</th></tr></thead><tbody>"+spentPartsRows+"</tbody></table></div>":"<p class=\"txs cm\">Noch keine Teile verbaut/einbaubereit.</p>")
++"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Summe</span><span>"+FMT(sc.spentParts.cost)+"</span></div>"
 +"</div></div>"
 +"<div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Kosten bis Fertigstellung</div>"
@@ -1202,6 +1212,7 @@ return "<tr><td style='padding:6px'>"+esc(gr.name)+(gr.ma.length?" <span style='
 +"<td>"+FMTH(gr.planZ)+"</td><td>"+FMTH(gr.istZ)+"</td><td style='color:"+statusCol+";font-weight:600'>"+statusTxt+"</td></tr>";
 }).join("")||"<tr><td colspan='4' style='padding:6px;color:#888'>Keine Baugruppen geplant.</td></tr>";
 var partsRows=sc.remParts.teile.map(function(t){return "<tr><td style='padding:6px'>"+esc(t.name)+"</td><td>"+esc(t.status)+"</td><td style='text-align:right'>"+FMT_EUR(t.ek>0?partEK(t):partVK(t))+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("")||"<tr><td colspan='4' style='padding:6px;color:#888'>Keine offenen Teile.</td></tr>";
+var spentPartsRows=sc.spentParts.teile.map(function(t){return "<tr><td style='padding:6px'>"+esc(t.name)+"</td><td>"+esc(t.status)+"</td><td style='text-align:right'>"+FMT_EUR(t.ek>0?partEK(t):partVK(t))+"</td></tr>";}).join("")||"<tr><td colspan='3' style='padding:6px;color:#888'>Noch keine Teile verbaut/einbaubereit.</td></tr>";
 var body="<div style='background:#1a1715;color:#fff;padding:8px;border-radius:5px;margin-bottom:12px;font-size:10px'>VERTRAULICH &bull; CHEFSACHE</div>"
 +"<h1 style='color:#c41230'>"+esc(p.name)+" &mdash; Szenariorechner</h1>"
 +"<p style='color:#888;font-size:11px'>"+(v?esc(v.marke+" "+v.modell)+" &bull; ":"")+esc(p.status)+" &bull; "+new Date().toLocaleDateString("de-DE")+"</p>"
@@ -1222,6 +1233,9 @@ var body="<div style='background:#1a1715;color:#fff;padding:8px;border-radius:5p
 +"<div class='sec' style='font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700'>Offene Ersatzteile ("+sc.remParts.count+")</div>"
 +"<table style='width:100%;border-collapse:collapse;font-size:12px'><thead><tr style='background:#f0ede8'><th style='padding:6px;text-align:left'>Teil</th><th style='text-align:left'>Status</th><th style='text-align:right'>Kosten</th><th>Lieferzeit</th></tr></thead><tbody>"+partsRows+"</tbody>"
 +"<tfoot><tr style='border-top:2px solid #ddd;font-weight:700'><td colspan='2' style='padding:6px'>Summe</td><td style='text-align:right'>"+FMT_EUR(sc.remParts.cost)+"</td><td></td></tr></tfoot></table>"
++"<div class='sec' style='font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700'>Verbaute Teile ("+sc.spentParts.count+")</div>"
++"<table style='width:100%;border-collapse:collapse;font-size:12px'><thead><tr style='background:#f0ede8'><th style='padding:6px;text-align:left'>Teil</th><th style='text-align:left'>Status</th><th style='text-align:right'>Kosten</th></tr></thead><tbody>"+spentPartsRows+"</tbody>"
++"<tfoot><tr style='border-top:2px solid #ddd;font-weight:700'><td colspan='2' style='padding:6px'>Summe</td><td style='text-align:right'>"+FMT_EUR(sc.spentParts.cost)+"</td></tr></tfoot></table>"
 +"<div class='sec' style='font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700'>Kosten bis Fertigstellung</div>"
 +"<table style='width:100%;border-collapse:collapse;font-size:12px'><tbody>"
 +"<tr><td style='padding:6px'>Kaufpreis Fahrzeug</td><td style='text-align:right'>"+FMT_EUR(sc.kaufpreis)+"</td></tr>"
