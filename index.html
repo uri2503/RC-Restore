@@ -526,6 +526,25 @@ for(var k=0;k<ma.length;k++){if(validIds[ma[k]])out[ma[k]]=(out[ma[k]]||0)+spent
 }}
 return out;
 }
+// Zusätzlich über die Stempeluhr erfasste Stunden je Mitarbeiter (Name-Abgleich, da Stempeluhr-
+// Einträge den alten SMP-Mitarbeiternamen tragen, nicht die neue CR-Mitarbeiter-ID). Bewusst NICHT
+// mit spentHoursByMA() zusammengeführt: beide Quellen können sich überschneiden (dieselbe Arbeit
+// sowohl über Stempeluhr als auch manuell als Ist-Zeit erfasst), ein automatisches Aufsummieren
+// würde also riskieren, Stunden doppelt zu zählen.
+function spentSMPHoursByMA(p){
+var out={},unresolvedHours=0;
+var byNameLower={};(D().mitarbeiter||[]).forEach(function(m){byNameLower[(m.name||"").toLowerCase()]=m;});
+var entries=getSMPTimeForProject(p);
+for(var i=0;i<entries.length;i++){
+var e=entries[i];
+var h=(e.dur||0)/3600000;
+if(h<=0)continue;
+var name=(e.ma||((e.note||"").match(/\[([^\]]+)\]$/)||["",""])[1]||"").trim();
+var m=name?byNameLower[name.toLowerCase()]:null;
+if(m)out[m.id]=(out[m.id]||0)+h;else unresolvedHours+=h;
+}
+return{byMA:out,unresolvedHours:unresolvedHours};
+}
 // "Noch offen" = Status vor s6 (Einbaubereit); Teile ohne Bestelldatum/Lieferzeit werden als unknownLead markiert statt ignoriert.
 function remPartsForProject(p,opts){
 var cutoff=pstIndex((opts&&opts.uptoStatus)||"s5");
@@ -608,6 +627,8 @@ var remByMA=remHoursByMA(p);
 var remLabor=laborCostByMA(remByMA);
 var spentByMA=spentHoursByMA(p);
 var spentLabor=laborCostByMA(spentByMA);
+var smpSpent=spentSMPHoursByMA(p);
+var smpLabor=laborCostByMA(smpSpent.byMA);
 var remParts=remPartsForProject(p);
 var alreadySpentParts=c.pkEK;
 var alreadySpent=alreadySpentParts+spentLabor.totalCost;
@@ -615,6 +636,7 @@ var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remLabor.tot
 var res={
 remHours:remLabor.totalHours,remHoursByMA:remByMA,remWageCost:remLabor.wageCost,remOverheadCost:remLabor.overheadCost,remHoursCost:remLabor.totalCost,unknownRateHours:remLabor.unknownRateHours,
 spentHours:spentLabor.totalHours,spentHoursByMA:spentByMA,spentWageCost:spentLabor.wageCost,spentOverheadCost:spentLabor.overheadCost,spentHoursCost:spentLabor.totalCost,spentUnknownRateHours:spentLabor.unknownRateHours,
+smpSpentHours:smpLabor.totalHours,smpSpentHoursByMA:smpSpent.byMA,smpSpentCost:smpLabor.totalCost,smpSpentUnresolvedHours:smpSpent.unresolvedHours,
 betriebskostenProStunde:betriebskostenProStunde(),remParts:remParts,alreadySpent:alreadySpent,alreadySpentParts:alreadySpentParts,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
 if(p.art==="intern"){
 res.zielVK=p.zielVK||0;
@@ -931,7 +953,9 @@ var html="<div class=\"g2\"><div>"
 +(sc.spentUnknownRateHours>0?"<div class=\"txs cr mt2\">&#9888; "+FMTH(sc.spentUnknownRateHours)+" ohne hinterlegten Stundensatz.</div>":"")
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm\"><span>Lohnkosten bisher</span><span>"+FMT(sc.spentWageCost)+"</span></div>"
 +"<div class=\"flex fjb tsm\"><span>Betriebskosten-Zuschlag ("+FMTH(sc.spentHours)+" &times; "+FMT(sc.betriebskostenProStunde)+"/h)</span><span>"+FMT(sc.spentOverheadCost)+"</span></div>"
-+"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.spentHours)+")</span><span>"+FMT(sc.spentHoursCost)+"</span></div></div>"
++"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.spentHours)+")</span><span>"+FMT(sc.spentHoursCost)+"</span></div>"
++(sc.smpSpentHours>0?"<div class=\"divid\"></div><div class=\"txs cm\" style=\"background:var(--bg);padding:8px;border-radius:6px\">&#9203; Zusätzlich über Stempeluhr erfasst: <strong>"+FMTH(sc.smpSpentHours)+"</strong> ("+FMT(sc.smpSpentCost)+" inkl. Betriebskosten) — <strong>nicht</strong> in der Summe oben enthalten, ggf. schon in den Ist-Stunden mitgezählt. Bitte abgleichen."+(sc.smpSpentUnresolvedHours>0?" ("+FMTH(sc.smpSpentUnresolvedHours)+" davon ohne zuordenbaren Mitarbeiter.)":"")+"</div>":"")
++"</div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Reststunden je Mitarbeiter</div>"
 +"<div class=\"txs cm mb2\">Reiner Personaleinsatz zum echten internen Stundensatz — Betriebskosten separat unten.</div>"
 +maRows
