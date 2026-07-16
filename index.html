@@ -555,15 +555,29 @@ var ageDays=p.start?Math.floor((new Date()-new Date(p.start))/86400000):0;
 return{kaufpreis:p.kaufpreis||0,spentParts:c.pkEK,spentLabor:c.tk,capital:(p.kaufpreis||0)+c.pkEK+c.tk,ageDays:ageDays};
 }
 // Szenariorechner: Restkosten bis Fertigstellung, bei internen Projekten zusätzlich Marge gegen Zielverkaufspreis.
+// Miete+Strom+Allg.Kosten aus den Betriebskosten-Einstellungen, je Arbeitsstunde. Personalkosten
+// bleiben hier aussen vor, da die echten MA-Stundensätze (mitarbeiter[].rate) bereits die
+// tatsächlichen Lohnkosten abbilden und sonst doppelt gerechnet würden.
+function betriebskostenProStunde(){
+var s=D().settings||{};
+return (+(s.miete||0))+(+(s.strom||0))+(+(s.agk||0));
+}
 function scenarioCalc(p){
 var c=costs(p);
 var byMA=remHoursByMA(p),remH=0;for(var k in byMA)remH+=byMA[k];
-var rate=p.ss||D().settings.ss||90;
-var remHoursCost=remH*rate;
+var maById={};(D().mitarbeiter||[]).forEach(function(m){maById[m.id]=m;});
+var bk=betriebskostenProStunde();
+var remHoursCost=0,unknownRateHours=0;
+for(var mid in byMA){
+var m=maById[mid];
+var wage=(m&&m.rate>0)?m.rate:0;
+if(!wage)unknownRateHours+=byMA[mid];
+remHoursCost+=byMA[mid]*(wage+bk);
+}
 var remParts=remPartsForProject(p);
 var alreadySpent=c.pkEK+c.tk;
 var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remHoursCost;
-var res={remHours:remH,remHoursByMA:byMA,remHoursCost:remHoursCost,remParts:remParts,alreadySpent:alreadySpent,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
+var res={remHours:remH,remHoursByMA:byMA,remHoursCost:remHoursCost,unknownRateHours:unknownRateHours,betriebskostenProStunde:bk,remParts:remParts,alreadySpent:alreadySpent,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
 if(p.art==="intern"){
 res.zielVK=p.zielVK||0;
 res.margin=res.zielVK-totalCostToComplete;
@@ -861,12 +875,20 @@ function renderScenario(){
 var pid=GV("sc-proj"),el=E("sc-result");if(!el)return;
 var p=getP(pid);if(!p){el.innerHTML="<div class=\"empty\"><p>Kein Projekt gewählt.</p></div>";return;}
 var d=D(),sc=scenarioCalc(p);
-var maById={};for(var i=0;i<(d.mitarbeiter||[]).length;i++)maById[d.mitarbeiter[i].id]=d.mitarbeiter[i].name;
-var maRows=Object.keys(sc.remHoursByMA).map(function(mid){return "<div class=\"flex fac fjb tsm\" style=\"padding:4px 0\"><span>"+esc(maById[mid]||"?")+"</span><span class=\"fw\">"+FMTH(sc.remHoursByMA[mid])+"</span></div>";}).join("")||"<p class=\"txs cm\">Keine Mitarbeiter zugeordnet.</p>";
+var maById={};for(var i=0;i<(d.mitarbeiter||[]).length;i++)maById[d.mitarbeiter[i].id]=d.mitarbeiter[i];
+var maRows=Object.keys(sc.remHoursByMA).map(function(mid){
+var m=maById[mid],wage=(m&&m.rate>0)?m.rate:0;
+var eff=wage+sc.betriebskostenProStunde;
+var rateTxt=wage?(eff+"&euro;/h"):"kein Satz hinterlegt";
+return "<div class=\"flex fac fjb tsm\" style=\"padding:4px 0\"><span>"+esc((m&&m.name)||"?")+"</span><span class=\""+(wage?"":"cr")+"\">"+FMTH(sc.remHoursByMA[mid])+" &times; "+rateTxt+"</span></div>";
+}).join("")||"<p class=\"txs cm\">Keine Mitarbeiter zugeordnet.</p>";
 var partsRows=sc.remParts.teile.map(function(t){return "<tr><td>"+esc(t.name)+"</td><td>"+psb(t.status)+"</td><td>"+FMT(t.ek>0?t.ek:t.kosten||0)+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("");
 var html="<div class=\"g2\"><div>"
-+"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Reststunden je Mitarbeiter</div>"+maRows
-+"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt</span><span>"+FMTH(sc.remHours)+" &times; "+(p.ss||d.settings.ss||90)+"&euro;/h = "+FMT(sc.remHoursCost)+"</span></div></div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Reststunden je Mitarbeiter</div>"
++"<div class=\"txs cm mb2\">Je Std.: echter MA-Satz + Betriebskosten (Miete/Strom/Allg. Kosten: "+FMT(sc.betriebskostenProStunde)+"/h)</div>"
++maRows
++(sc.unknownRateHours>0?"<div class=\"txs cr mt2\">&#9888; "+FMTH(sc.unknownRateHours)+" ohne hinterlegten Stundensatz — nur Betriebskosten eingerechnet, Lohnkosten fehlen (siehe Einstellungen).</div>":"")
++"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.remHours)+")</span><span>"+FMT(sc.remHoursCost)+"</span></div></div>"
 +"<div class=\"card\"><div class=\"fw tsm mb3\">Offene Ersatzteile ("+sc.remParts.count+")</div>"
 +(partsRows?"<div class=\"twrap\"><table><thead><tr><th>Teil</th><th>Status</th><th>Kosten</th><th>Lieferzeit</th></tr></thead><tbody>"+partsRows+"</tbody></table></div>":"<p class=\"txs cm\">Keine offenen Teile.</p>")
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Summe</span><span>"+FMT(sc.remParts.cost)+"</span></div>"
@@ -1642,6 +1664,7 @@ for(var i=0;i<d.mitarbeiter.length;i++){var ma=d.mitarbeiter[i];
 maRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)\">"
 +"<span style=\"flex:1;font-size:13px\">"+ma.name+"</span>"
 +"<span class=\"txs cm\" style=\"margin-right:8px\">"+ma.rolle+"</span>"
++"<span class=\"badge b-amber\" style=\"margin-right:8px\">"+(ma.rate>0?ma.rate+"€/h intern":"kein Satz")+"</span>"
 +"<span class=\"badge b-blue\" style=\"margin-right:8px\">"+(ma.wochenkapazitaet>0?ma.wochenkapazitaet+"h/Wo":"Kapazität unbekannt")+"</span>"
 +"<button class=\"bic\" onclick=\"delMACR("+i+")\">&#128465;</button></div>";}
 return "<div class=\"page\"><div class=\"pt mb3\">Stammdaten &amp; Einstellungen</div>"
@@ -1690,9 +1713,11 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128101; Mitarbeiter (Fertigungsplanung)</div>"
 +"<div class=\"txs cm mb2\">Diese Liste wird für die Baugruppen-/Aufgaben-Zuordnung in Fertigungsplanung &amp; Szenariorechner genutzt (separat vom „Mitarbeiterstamm“ unter Stammdaten).</div>"
 +(maRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+maRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Mitarbeiter.</p>")
-+"<div class=\"frow3 mb2\"><div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ma-rolle\"></div>"
++"<div class=\"frow\" style=\"grid-template-columns:1fr 1fr\"><div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ma-rolle\"></div></div>"
++"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Stundensatz intern (Lohnkosten, &euro;/h)</label><input class=\"fi\" type=\"number\" id=\"ma-satz\" placeholder=\"z.B. 28\" min=\"0\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Wochenkapazität (h)</label><input class=\"fi\" type=\"number\" id=\"ma-kap\" placeholder=\"z.B. 38\" min=\"0\"></div></div>"
++"<div class=\"txs cm mb2\">Wichtig: der interne Stundensatz ist die tatsächliche Lohnkostenschätzung des Mitarbeiters, nicht der Verkaufspreis für Kunden.</div>"
 +"<button class=\"btn btn-p btn-sm\" onclick=\"addMACR()\">+ Mitarbeiter</button></div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#127981; Werkstatt-Ressourcen</div>"
 +"<div class=\"txs cm mb2\">Anzahl paralleler Plätze je Bereich für die Kapazitätsprüfung in der Fertigungsplanung.</div>"
@@ -3609,10 +3634,10 @@ var pg=document.getElementById('pg');if(pg&&APP.view==='stamm')pg.innerHTML=rSta
 function addMACR(){
 var d=D();
 if(!d.mitarbeiter)d.mitarbeiter=[];
-var name=GV('ma-name').trim(),rolle=GV('ma-rolle').trim(),kap=GF('ma-kap');
+var name=GV('ma-name').trim(),rolle=GV('ma-rolle').trim(),kap=GF('ma-kap'),satz=GF('ma-satz');
 if(!name){alert('Bitte Name eingeben.');return;}
 for(var i=0;i<d.mitarbeiter.length;i++) if(d.mitarbeiter[i].name===name){alert('Mitarbeiter bereits vorhanden.');return;}
-d.mitarbeiter.push({id:uid(),name:name,rolle:rolle,rate:0,tel:'',wochenkapazitaet:kap||0});
+d.mitarbeiter.push({id:uid(),name:name,rolle:rolle,rate:satz||0,tel:'',wochenkapazitaet:kap||0});
 saveData();render();
 }
 function delMACR(i){
