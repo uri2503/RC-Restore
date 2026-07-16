@@ -496,6 +496,23 @@ return{pk:pk,pkEK:pkEK,pkErtrag:pk-pkEK,thCR:thCR,thSMP:thSMP,th:th,tk:tk,tot:pk
 function pstIndex(status){for(var i=0;i<PST.length;i++)if(PST[i].v===status)return i;return 0;}
 // Item-level ma[] overrides the parent Baugruppe's ma[]; an empty item list inherits the group's assignees.
 function effectiveMA(g,it){return(it.ma&&it.ma.length)?it.ma:(g.ma||[]);}
+// Stunden, die über Stempeluhr/Manuell erfassen mit dieser konkreten Aufgabe (itemId) verknüpft
+// wurden — siehe buildAufgabeOpts()/stampAction()/zManAdd(). Globaler Scan über APP.smp.zeit ist
+// unkritisch, da itemId projektübergreifend eindeutig ist (uid()).
+function stempeluhrHoursForItem(itemId){
+if(!itemId)return 0;
+var h=0;
+for(var i=0;i<APP.smp.zeit.length;i++){if(APP.smp.zeit[i].itemId===itemId)h+=(APP.smp.zeit[i].dur||0)/3600000;}
+return h;
+}
+// Effektive Ist-Zeit einer Aufgabe: bevorzugt die über Stempeluhr/Manuell erfassen verknüpften
+// Stunden (der tatsächliche Alltags-Workflow bei laufenden Projekten), fällt nur auf das manuell
+// eingetragene Ist-Zeit-Feld zurück, wenn dafür gar keine Stempeluhr-Einträge existieren (z.B.
+// nachträgliche Zusammenfassung eines bereits abgeschlossenen Projekts).
+function effectiveIstZ(it){
+var sh=stempeluhrHoursForItem(it.id);
+return sh>0?sh:(it.istZ||0);
+}
 function remHoursByMA(p){
 var out={};
 // Ignore ma-ids that no longer match a current Mitarbeiter (e.g. left over from a
@@ -503,7 +520,7 @@ var out={};
 var validIds={};(D().mitarbeiter||[]).forEach(function(m){validIds[m.id]=true;});
 for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
 for(var j=0;j<g.items.length;j++){var it=g.items[j];
-var rem=Math.max(0,(it.planZ||0)-(it.istZ||0));
+var rem=Math.max(0,(it.planZ||0)-effectiveIstZ(it));
 if(rem<=0)continue;
 var ma=effectiveMA(g,it);
 for(var k=0;k<ma.length;k++){if(validIds[ma[k]])out[ma[k]]=(out[ma[k]]||0)+rem;}
@@ -511,32 +528,32 @@ for(var k=0;k<ma.length;k++){if(validIds[ma[k]])out[ma[k]]=(out[ma[k]]||0)+rem;}
 return out;
 }
 function remHoursForMA(p,maId){return remHoursByMA(p)[maId]||0;}
-// Stunden, die je Mitarbeiter laut Ist-Zeit auf den Aufgaben bereits geleistet wurden — separate
-// Datenquelle von costs()'s Tagebuch/SMP-Stunden, aber die, die planZ/istZ (und damit auch
-// remHoursByMA) tatsächlich zugrunde liegt, daher hier für eine konsistente Kostenbetrachtung genutzt.
+// Stunden, die je Mitarbeiter bereits geleistet wurden — effectiveIstZ() sorgt dafür, dass hier in
+// erster Linie Stempeluhr/Manuell-erfassen-Stunden zählen, mit dem manuellen Ist-Zeit-Feld nur als
+// Fallback für Aufgaben ohne Stempeluhr-Verknüpfung.
 function spentHoursByMA(p){
 var out={};
 var validIds={};(D().mitarbeiter||[]).forEach(function(m){validIds[m.id]=true;});
 for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
 for(var j=0;j<g.items.length;j++){var it=g.items[j];
-var spent=Math.max(0,it.istZ||0);
+var spent=Math.max(0,effectiveIstZ(it));
 if(spent<=0)continue;
 var ma=effectiveMA(g,it);
 for(var k=0;k<ma.length;k++){if(validIds[ma[k]])out[ma[k]]=(out[ma[k]]||0)+spent;}
 }}
 return out;
 }
-// Zusätzlich über die Stempeluhr erfasste Stunden je Mitarbeiter (Name-Abgleich, da Stempeluhr-
-// Einträge den alten SMP-Mitarbeiternamen tragen, nicht die neue CR-Mitarbeiter-ID). Bewusst NICHT
-// mit spentHoursByMA() zusammengeführt: beide Quellen können sich überschneiden (dieselbe Arbeit
-// sowohl über Stempeluhr als auch manuell als Ist-Zeit erfasst), ein automatisches Aufsummieren
-// würde also riskieren, Stunden doppelt zu zählen.
+// Stunden, die zwar auf dieses Projekt gebucht wurden (Stempeluhr/Manuell erfassen), aber OHNE
+// Aufgaben-Zuordnung (itemId leer) — fließen bewusst NICHT in spentHoursByMA() ein, weil sie sich
+// keiner konkreten Aufgabe zurechnen lassen. Reiner Hinweis, damit sowas nachgepflegt werden kann;
+// Name-Abgleich, da Stempeluhr-Einträge den alten SMP-Mitarbeiternamen tragen, nicht die CR-ID.
 function spentSMPHoursByMA(p){
 var out={},unresolvedHours=0;
 var byNameLower={};(D().mitarbeiter||[]).forEach(function(m){byNameLower[(m.name||"").toLowerCase()]=m;});
 var entries=getSMPTimeForProject(p);
 for(var i=0;i<entries.length;i++){
 var e=entries[i];
+if(e.itemId)continue;
 var h=(e.dur||0)/3600000;
 if(h<=0)continue;
 var name=(e.ma||((e.note||"").match(/\[([^\]]+)\]$/)||["",""])[1]||"").trim();
@@ -954,7 +971,7 @@ var html="<div class=\"g2\"><div>"
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm\"><span>Lohnkosten bisher</span><span>"+FMT(sc.spentWageCost)+"</span></div>"
 +"<div class=\"flex fjb tsm\"><span>Betriebskosten-Zuschlag ("+FMTH(sc.spentHours)+" &times; "+FMT(sc.betriebskostenProStunde)+"/h)</span><span>"+FMT(sc.spentOverheadCost)+"</span></div>"
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.spentHours)+")</span><span>"+FMT(sc.spentHoursCost)+"</span></div>"
-+(sc.smpSpentHours>0?"<div class=\"divid\"></div><div class=\"txs cm\" style=\"background:var(--bg);padding:8px;border-radius:6px\">&#9203; Zusätzlich über Stempeluhr erfasst: <strong>"+FMTH(sc.smpSpentHours)+"</strong> ("+FMT(sc.smpSpentCost)+" inkl. Betriebskosten) — <strong>nicht</strong> in der Summe oben enthalten, ggf. schon in den Ist-Stunden mitgezählt. Bitte abgleichen."+(sc.smpSpentUnresolvedHours>0?" ("+FMTH(sc.smpSpentUnresolvedHours)+" davon ohne zuordenbaren Mitarbeiter.)":"")+"</div>":"")
++(sc.smpSpentHours>0?"<div class=\"divid\"></div><div class=\"txs cm\" style=\"background:var(--bg);padding:8px;border-radius:6px\">&#9203; <strong>"+FMTH(sc.smpSpentHours)+"</strong> über Stempeluhr/Manuell erfasst, aber ohne Aufgaben-Zuordnung ("+FMT(sc.smpSpentCost)+" inkl. Betriebskosten) — zählen deshalb <strong>nicht</strong> in der Summe oben. Bitte bei diesen Einträgen eine Aufgabe nachtragen."+(sc.smpSpentUnresolvedHours>0?" ("+FMTH(sc.smpSpentUnresolvedHours)+" davon zusätzlich ohne zuordenbaren Mitarbeiter.)":"")+"</div>":"")
 +"</div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Reststunden je Mitarbeiter</div>"
 +"<div class=\"txs cm mb2\">Reiner Personaleinsatz zum echten internen Stundensatz — Betriebskosten separat unten.</div>"
@@ -1156,6 +1173,25 @@ list.sort();
 var opts='<option value="">-- Kein Mitarbeiter --</option>';
 for(var i=0;i<list.length;i++) opts+='<option value="'+list[i]+'"'+(list[i]===selected?' selected':'')+'>'+list[i]+'</option>';
 return opts;
+}
+// Aufgaben-Auswahl aus der ECHTEN Planung des gewählten Projekts (id-basiert), nicht Freitext wie
+// "Arbeitsgang" — das ist die Grundlage dafür, Ist-Stunden automatisch aus Stempeluhr/Manuell
+// erfassen abzuleiten, statt sie separat auf der Aufgabe eintippen zu müssen.
+function buildAufgabeOpts(projName,selected){
+var pid=matchProjectId(projName);
+var p=pid?getP(pid):null;
+var opts="<option value=\"\">-- Keine Aufgabe --</option>";
+if(!p||!p.gruppen)return opts;
+for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
+for(var j=0;j<g.items.length;j++){var it=g.items[j];
+opts+="<option value=\""+it.id+"\""+(it.id===selected?" selected":"")+">"+esc(g.name)+" / "+esc(it.name)+"</option>";
+}}
+return opts;
+}
+function refreshAufgabeOpts(projSelId,aufgabeSelId){
+var projSel=E(projSelId),aufgabeSel=E(aufgabeSelId);
+if(!projSel||!aufgabeSel)return;
+aufgabeSel.innerHTML=buildAufgabeOpts(projSel.value,"");
 }
 function buildTaskOpts(selected){
 var seen={},list=[];
@@ -2052,7 +2088,8 @@ openM(MH(it?"Punkt bearbeiten":"Neuer Punkt")+"<div class=\"mb2\">"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Plan-Kosten</label><input class=\"fi\" type=\"number\" id=\"im-pk\" value=\""+(it?it.planK:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Plan-Zeit</label><input class=\"fi\" type=\"number\" id=\"im-pz\" value=\""+(it?it.planZ:"")+"\"></div></div>"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Ist-Kosten</label><input class=\"fi\" type=\"number\" id=\"im-ik\" value=\""+(it?it.istK:"")+"\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">Ist-Zeit</label><input class=\"fi\" type=\"number\" id=\"im-iz\" value=\""+(it?it.istZ:"")+"\"></div></div>"
++"<div class=\"fg\"><label class=\"fl\">Ist-Zeit"+(it&&stempeluhrHoursForItem(it.id)>0?" <span class=\"txs cm\">(überschrieben durch Stempeluhr)</span>":"")+"</label><input class=\"fi\" type=\"number\" id=\"im-iz\" value=\""+(it?it.istZ:"")+"\"></div></div>"
++(it&&stempeluhrHoursForItem(it.id)>0?"<div class=\"fg txs cm\">&#9203; Aus Stempeluhr/Manuell erfassen ermittelt: <strong>"+FMTH(stempeluhrHoursForItem(it.id))+"</strong> — dieser Wert wird in Fertigungsplanung &amp; Szenariorechner statt des Ist-Zeit-Felds oben verwendet.</div>":"")
 +"<div class=\"fg\"><label class=\"fl\">Status</label><select class=\"fsel\" id=\"im-s\">"+sopt+"</select></div>"
 +"<div class=\"fg\"><label class=\"fl\">Zust\u00e4ndige Mitarbeiter <span class=\"txs cm\">(leer = wie Baugruppe)</span></label><div class=\"pillg\" id=\"im-mapg\">"+buildMAPills(ima,"im")+"</div><input type=\"hidden\" id=\"im-ma\" value=\""+ima.join(",")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Bemerkungen</label><textarea class=\"fta\" id=\"im-b\" style=\"min-height:55px\">"+(it?it.bem:"")+"</textarea></div></div>"
@@ -4092,6 +4129,7 @@ var end=Date.now();
 var dur=end-stampStart-(stampPause?pauseTotal+(end-stampPause):pauseTotal);
 var rate=parseFloat(document.getElementById('z-rate')?document.getElementById('z-rate').value:0)||0;
 var proj=document.getElementById('z-proj')?document.getElementById('z-proj').value:'';
+var aufgabe=document.getElementById('z-aufgabe')?document.getElementById('z-aufgabe').value:'';
 var task=document.getElementById('z-task')?document.getElementById('z-task').value:'';
 var noteRaw=document.getElementById('z-note')?document.getElementById('z-note').value:'';
 var note=task?(noteRaw?task+' – '+noteRaw:task):noteRaw;
@@ -4102,7 +4140,7 @@ DB.zeit.push({
 id:uid(), date:new Date().toISOString().slice(0,10),
 start:new Date(stampStart).toISOString(),
 end:new Date(end).toISOString(),
-dur:dur, rate:rate, pay:pay, proj:proj, note:note, pid:matchProjectId(proj), ma:ma
+dur:dur, rate:rate, pay:pay, proj:proj, note:note, pid:matchProjectId(proj), ma:ma, itemId:aufgabe
 });
 saveDB();
 stampStart=null; stampPause=null; pauseTotal=0;
@@ -4116,6 +4154,7 @@ var von=document.getElementById('zm-von')?document.getElementById('zm-von').valu
 var bis=document.getElementById('zm-bis')?document.getElementById('zm-bis').value:'';
 var rate=parseFloat(document.getElementById('zm-rate')?document.getElementById('zm-rate').value:0)||0;
 var proj=document.getElementById('zm-proj')?document.getElementById('zm-proj').value:'';
+var aufgabe=document.getElementById('zm-aufgabe')?document.getElementById('zm-aufgabe').value:'';
 var ztask=document.getElementById('zm-task')?document.getElementById('zm-task').value:'';
 var noteRaw=document.getElementById('zm-note')?document.getElementById('zm-note').value:'';
 var zma=document.getElementById('zm-ma')?document.getElementById('zm-ma').value:'';
@@ -4128,7 +4167,7 @@ if(endDt<=startDt) return;
 var dur=(endDt-startDt)-(pause*60000);
 if(dur<0) dur=0;
 var pay=calcPay(dur,rate);
-DB.zeit.push({id:uid(),date:d,start:startDt.toISOString(),end:endDt.toISOString(),dur:dur,rate:rate,pay:pay,proj:proj,note:note,pause:pause,pid:matchProjectId(proj),ma:zma});
+DB.zeit.push({id:uid(),date:d,start:startDt.toISOString(),end:endDt.toISOString(),dur:dur,rate:rate,pay:pay,proj:proj,note:note,pause:pause,pid:matchProjectId(proj),ma:zma,itemId:aufgabe});
 saveDB();nav('zeitliste');
 }
 function syncTaskNote(selId, noteId){
@@ -4216,7 +4255,8 @@ return '<div class="page">'
   +'<div style="display:flex;justify-content:center;margin-bottom:14px">'+stampBtns+'</div>'
   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
   +'<div><label class="fl">Stundensatz €</label><input class="fi" id="z-rate" type="number" placeholder="109" value="'+( APP.data.settings.ss||109)+'" style="width:100%"></div>'
-  +'<div><label class="fl">Projekt</label><select class="fsel" id="z-proj" style="width:100%">'+projOpts+'</select></div>'
+  +'<div><label class="fl">Projekt</label><select class="fsel" id="z-proj" style="width:100%" onchange="refreshAufgabeOpts(\'z-proj\',\'z-aufgabe\')">'+projOpts+'</select></div>'
+  +'<div style="grid-column:1/-1"><label class="fl">Aufgabe (Planung)</label><select class="fsel" id="z-aufgabe" style="width:100%">'+buildAufgabeOpts('','')+'</select></div>'
   +'<div style="grid-column:1/-1"><label class="fl">Arbeitsgang</label><select class="fsel" id="z-task" style="width:100%">'+taskOpts+'</select></div>'
   +'<div style="grid-column:1/-1"><label class="fl">Notiz / Detail</label><input class="fi" id="z-note" placeholder="Zusätzliche Details…" style="width:100%"></div>'
   +'<div style="grid-column:1/-1"><label class="fl">Mitarbeiter</label><select class="fsel" id="z-ma" style="width:100%">'+maOpts+'</select></div>'
@@ -4230,7 +4270,8 @@ return '<div class="page">'
   +'<div><label class="fl">Von</label><input class="fi" id="zm-von" type="time" style="width:100%"></div>'
   +'<div><label class="fl">Bis</label><input class="fi" id="zm-bis" type="time" style="width:100%"></div>'
   +'<div><label class="fl">Stundensatz €</label><input class="fi" id="zm-rate" type="number" placeholder="109" value="'+(APP.data.settings.ss||109)+'" style="width:100%"></div>'
-  +'<div><label class="fl">Projekt</label><select class="fsel" id="zm-proj" style="width:100%">'+projOpts+'</select></div>'
+  +'<div><label class="fl">Projekt</label><select class="fsel" id="zm-proj" style="width:100%" onchange="refreshAufgabeOpts(\'zm-proj\',\'zm-aufgabe\')">'+projOpts+'</select></div>'
+  +'<div style="grid-column:1/-1"><label class="fl">Aufgabe (Planung)</label><select class="fsel" id="zm-aufgabe" style="width:100%">'+buildAufgabeOpts('','')+'</select></div>'
   +'<div style="grid-column:1/-1"><label class="fl">Arbeitsgang</label><select class="fsel" id="zm-task" style="width:100%">'+taskOpts+'</select></div>'
   +'<div style="grid-column:1/-1"><label class="fl">Notiz / Detail</label><input class="fi" id="zm-note" placeholder="Zusätzliche Details…" style="width:100%"></div>'
   +'<div style="grid-column:1/-1"><label class="fl">Mitarbeiter</label><select class="fsel" id="zm-ma" style="width:100%">'+maOpts+'</select></div>'
