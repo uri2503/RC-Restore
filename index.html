@@ -725,11 +725,16 @@ return{wageCost:wageCost,overheadCost:overheadCost,totalCost:wageCost+overheadCo
 // Nur sinnvoll für art==='intern': Kapital, das in einem zurückgestellten Eigenprojekt gebunden ist.
 // Arbeitszeit-Anteil kommt aus den Ist-Stunden je Aufgabe (wie remHoursByMA), nicht aus costs()'s
 // Tagebuch/SMP-Stunden — sonst würde bereits geleistete Arbeit hier unsichtbar bleiben.
+// Ersatzteile: c.pkEK ist die Summe ALLER Teile unabhängig vom Status; remPartsForProject() ist die
+// Summe der noch offenen (Status vor "Einbaubereit"). Die Differenz sind exakt die bereits
+// eingebauten/einbaubereiten Teile — "bereits investiert" und "noch offen" überschneiden sich dadurch
+// nie und ergeben zusammen immer wieder c.pkEK.
 function capitalTiedUp(p){
 var c=costs(p);
+var spentParts=c.pkEK-remPartsForProject(p).cost;
 var spentLabor=laborCostByMA(spentHoursByMA(p),totalSpentTaskHours(p));
 var ageDays=p.start?Math.floor((new Date()-new Date(p.start))/86400000):0;
-return{kaufpreis:p.kaufpreis||0,spentParts:c.pkEK,spentLabor:spentLabor.totalCost,capital:(p.kaufpreis||0)+c.pkEK+spentLabor.totalCost,ageDays:ageDays};
+return{kaufpreis:p.kaufpreis||0,spentParts:spentParts,spentLabor:spentLabor.totalCost,capital:(p.kaufpreis||0)+spentParts+spentLabor.totalCost,ageDays:ageDays};
 }
 // Szenariorechner: Restkosten bis Fertigstellung, bei internen Projekten zusätzlich Marge gegen Zielverkaufspreis.
 // "Bereits investiert" nutzt für die Arbeitszeit bewusst die Ist-Stunden je Aufgabe (spentHoursByMA),
@@ -744,7 +749,10 @@ var spentLabor=laborCostByMA(spentByMA,totalSpentTaskHours(p));
 var smpSpent=spentSMPHoursByMA(p);
 var smpLabor=laborCostByMA(smpSpent.byMA);
 var remParts=remPartsForProject(p);
-var alreadySpentParts=c.pkEK;
+// c.pkEK ist die Summe ALLER Teile unabhängig vom Status; remParts.cost nur die noch offenen
+// (Status vor "Einbaubereit"). Die Differenz sind die bereits eingebauten/einbaubereiten Teile —
+// so zählt kein Teil gleichzeitig als "bereits investiert" UND "noch offen".
+var alreadySpentParts=c.pkEK-remParts.cost;
 var alreadySpent=alreadySpentParts+spentLabor.totalCost;
 var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remLabor.totalCost;
 var res={
