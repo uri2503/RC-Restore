@@ -642,6 +642,20 @@ for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
 for(var j=0;j<g.items.length;j++){var it=g.items[j];h+=Math.max(0,effectiveIstZ(it));}}
 return h;
 }
+// Anteil von totalRemTaskHours()/totalSpentTaskHours(), der auf Aufgaben OHNE zugeordneten Mitarbeiter
+// entfällt — zählt zwar korrekt in den Betriebskosten mit (die Werkstatt kostet auch bei nicht
+// zugeordneter Arbeit), taucht aber in keiner "je Mitarbeiter"-Aufstellung auf. Ohne diesen Hinweis
+// sieht die Betriebskosten-Stundenzahl dort größer aus als die Summe der gelisteten MA-Stunden, was
+// wie ein Rechenfehler wirkt statt wie eine fehlende MA-Zuordnung.
+function unassignedTaskHours(p,mode){
+var h=0;
+for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
+for(var j=0;j<g.items.length;j++){var it=g.items[j];
+if(effectiveMA(g,it).length>0)continue;
+h+=mode==="rem"?Math.max(0,(it.planZ||0)-effectiveIstZ(it)):Math.max(0,effectiveIstZ(it));
+}}
+return h;
+}
 // Lohn- und Betriebskosten für ein {maId:stunden}-Objekt (remHoursByMA oder spentHoursByMA).
 // Lohnkosten bleiben bewusst je MA (mehrere Zugeordnete = mehrere bezahlte Personen); der
 // Betriebskosten-Zuschlag nutzt stattdessen taskHours (einmal je Aufgabe, s.o.), sonst würde er sich
@@ -686,8 +700,8 @@ var alreadySpentParts=c.pkEK;
 var alreadySpent=alreadySpentParts+spentLabor.totalCost;
 var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remLabor.totalCost;
 var res={
-remHours:remLabor.overheadHours,remHoursByMA:remByMA,remWageCost:remLabor.wageCost,remOverheadCost:remLabor.overheadCost,remHoursCost:remLabor.totalCost,unknownRateHours:remLabor.unknownRateHours,
-spentHours:spentLabor.overheadHours,spentHoursByMA:spentByMA,spentWageCost:spentLabor.wageCost,spentOverheadCost:spentLabor.overheadCost,spentHoursCost:spentLabor.totalCost,spentUnknownRateHours:spentLabor.unknownRateHours,
+remHours:remLabor.overheadHours,remHoursByMA:remByMA,remWageCost:remLabor.wageCost,remOverheadCost:remLabor.overheadCost,remHoursCost:remLabor.totalCost,unknownRateHours:remLabor.unknownRateHours,remUnassignedHours:unassignedTaskHours(p,"rem"),
+spentHours:spentLabor.overheadHours,spentHoursByMA:spentByMA,spentWageCost:spentLabor.wageCost,spentOverheadCost:spentLabor.overheadCost,spentHoursCost:spentLabor.totalCost,spentUnknownRateHours:spentLabor.unknownRateHours,spentUnassignedHours:unassignedTaskHours(p,"spent"),
 smpSpentHours:smpLabor.totalHours,smpSpentHoursByMA:smpSpent.byMA,smpSpentCost:smpLabor.totalCost,smpSpentUnresolvedHours:smpSpent.unresolvedHours,
 betriebskostenProStunde:betriebskostenProStunde(),remParts:remParts,alreadySpent:alreadySpent,alreadySpentParts:alreadySpentParts,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
 if(p.art==="intern"){
@@ -1059,6 +1073,7 @@ var html=groupsSection+"<div class=\"g2\"><div>"
 +(sc.spentUnknownRateHours>0?"<div class=\"txs cr mt2\">&#9888; "+FMTH(sc.spentUnknownRateHours)+" ohne hinterlegten Stundensatz.</div>":"")
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm\"><span>Lohnkosten bisher</span><span>"+FMT(sc.spentWageCost)+"</span></div>"
 +"<div class=\"flex fjb tsm\"><span>Betriebskosten-Zuschlag ("+FMTH(sc.spentHours)+" &times; "+FMT(sc.betriebskostenProStunde)+"/h)</span><span>"+FMT(sc.spentOverheadCost)+"</span></div>"
++(sc.spentUnassignedHours>0?"<div class=\"txs cm\" style=\"padding-left:10px\">davon "+FMTH(sc.spentUnassignedHours)+" auf Aufgaben ohne zugeordneten Mitarbeiter &mdash; z&auml;hlen hier mit, tauchen oben nicht auf</div>":"")
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.spentHours)+")</span><span>"+FMT(sc.spentHoursCost)+"</span></div>"
 +(sc.smpSpentHours>0?"<div class=\"divid\"></div><div class=\"txs cm\" style=\"background:var(--bg);padding:8px;border-radius:6px\">&#9203; <strong>"+FMTH(sc.smpSpentHours)+"</strong> über Stempeluhr/Manuell erfasst, aber ohne Aufgaben-Zuordnung ("+FMT(sc.smpSpentCost)+" inkl. Betriebskosten) — zählen deshalb <strong>nicht</strong> in der Summe oben. Bitte bei diesen Einträgen eine Aufgabe nachtragen."+(sc.smpSpentUnresolvedHours>0?" ("+FMTH(sc.smpSpentUnresolvedHours)+" davon zusätzlich ohne zuordenbaren Mitarbeiter.)":"")+"</div>":"")
 +"</div>"
@@ -1068,6 +1083,7 @@ var html=groupsSection+"<div class=\"g2\"><div>"
 +(sc.unknownRateHours>0?"<div class=\"txs cr mt2\">&#9888; "+FMTH(sc.unknownRateHours)+" ohne hinterlegten Stundensatz — dafür fehlen die Lohnkosten in der Summe (siehe Einstellungen).</div>":"")
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm\"><span>Lohnkosten Reststunden</span><span>"+FMT(sc.remWageCost)+"</span></div>"
 +"<div class=\"flex fjb tsm\"><span>Betriebskosten-Zuschlag ("+FMTH(sc.remHours)+" &times; "+FMT(sc.betriebskostenProStunde)+"/h)</span><span>"+FMT(sc.remOverheadCost)+"</span></div>"
++(sc.remUnassignedHours>0?"<div class=\"txs cm\" style=\"padding-left:10px\">davon "+FMTH(sc.remUnassignedHours)+" auf Aufgaben ohne zugeordneten Mitarbeiter &mdash; z&auml;hlen hier mit, tauchen oben nicht auf</div>":"")
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.remHours)+")</span><span>"+FMT(sc.remHoursCost)+"</span></div></div>"
 +"<div class=\"card\"><div class=\"fw tsm mb3\">Offene Ersatzteile ("+sc.remParts.count+")</div>"
 +(partsRows?"<div class=\"twrap\"><table><thead><tr><th>Teil</th><th>Status</th><th>Kosten</th><th>Lieferzeit</th></tr></thead><tbody>"+partsRows+"</tbody></table></div>":"<p class=\"txs cm\">Keine offenen Teile.</p>")
@@ -1139,11 +1155,13 @@ var body="<div style='background:#1a1715;color:#fff;padding:8px;border-radius:5p
 +"<table style='width:100%;border-collapse:collapse;font-size:12px'><thead><tr style='background:#f0ede8'><th style='padding:6px;text-align:left'>Mitarbeiter</th><th style='text-align:left'>Arbeitsgang</th><th>Std.</th><th>Satz</th><th style='text-align:right'>Kosten</th></tr></thead><tbody>"+maTable(sc.spentHoursByMA,spentByMAGroup)+"</tbody>"
 +"<tfoot><tr style='background:#f5f5f5;font-weight:700'><td colspan='4' style='padding:6px'>Lohnkosten bisher</td><td style='text-align:right'>"+FMT_EUR(sc.spentWageCost)+"</td></tr>"
 +"<tr><td colspan='4' style='padding:6px'>Betriebskosten-Zuschlag ("+FMTH(sc.spentHours)+" &times; "+FMT_EUR(sc.betriebskostenProStunde)+"/h)</td><td style='text-align:right'>"+FMT_EUR(sc.spentOverheadCost)+"</td></tr>"
++(sc.spentUnassignedHours>0?"<tr><td colspan='4' style='padding:2px 6px 6px 20px;font-weight:400;color:#888;font-size:11px'>davon "+FMTH(sc.spentUnassignedHours)+" auf Aufgaben ohne zugeordneten Mitarbeiter</td><td></td></tr>":"")
 +"<tr style='border-top:2px solid #ddd;font-weight:700'><td colspan='4' style='padding:6px'>Gesamt</td><td style='text-align:right'>"+FMT_EUR(sc.spentHoursCost)+"</td></tr></tfoot></table>"
 +"<div class='sec' style='font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700'>Reststunden je Mitarbeiter</div>"
 +"<table style='width:100%;border-collapse:collapse;font-size:12px'><thead><tr style='background:#f0ede8'><th style='padding:6px;text-align:left'>Mitarbeiter</th><th style='text-align:left'>Arbeitsgang</th><th>Std.</th><th>Satz</th><th style='text-align:right'>Kosten</th></tr></thead><tbody>"+maTable(sc.remHoursByMA,remByMAGroup)+"</tbody>"
 +"<tfoot><tr style='background:#f5f5f5;font-weight:700'><td colspan='4' style='padding:6px'>Lohnkosten Reststunden</td><td style='text-align:right'>"+FMT_EUR(sc.remWageCost)+"</td></tr>"
 +"<tr><td colspan='4' style='padding:6px'>Betriebskosten-Zuschlag ("+FMTH(sc.remHours)+" &times; "+FMT_EUR(sc.betriebskostenProStunde)+"/h)</td><td style='text-align:right'>"+FMT_EUR(sc.remOverheadCost)+"</td></tr>"
++(sc.remUnassignedHours>0?"<tr><td colspan='4' style='padding:2px 6px 6px 20px;font-weight:400;color:#888;font-size:11px'>davon "+FMTH(sc.remUnassignedHours)+" auf Aufgaben ohne zugeordneten Mitarbeiter</td><td></td></tr>":"")
 +"<tr style='border-top:2px solid #ddd;font-weight:700'><td colspan='4' style='padding:6px'>Gesamt</td><td style='text-align:right'>"+FMT_EUR(sc.remHoursCost)+"</td></tr></tfoot></table>"
 +"<div class='sec' style='font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700'>Offene Ersatzteile ("+sc.remParts.count+")</div>"
 +"<table style='width:100%;border-collapse:collapse;font-size:12px'><thead><tr style='background:#f0ede8'><th style='padding:6px;text-align:left'>Teil</th><th style='text-align:left'>Status</th><th style='text-align:right'>Kosten</th><th>Lieferzeit</th></tr></thead><tbody>"+partsRows+"</tbody>"
