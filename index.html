@@ -609,10 +609,26 @@ function betriebskostenProStunde(){
 var s=D().settings||{};
 return (+(s.miete||0))+(+(s.strom||0))+(+(s.agk||0));
 }
-// Lohn- und Betriebskosten für ein {maId:stunden}-Objekt (remHoursByMA oder spentHoursByMA),
-// bewusst getrennt gehalten (nicht je MA verrechnet), damit der reine Personaleinsatz je
-// Mitarbeiter nicht durch den Gemeinkosten-Anteil verwässert wird.
-function laborCostByMA(hoursByMA){
+// Aufgaben-Stunden EINMAL gezählt, unabhängig von der Zahl zugeordneter Mitarbeiter — Grundlage für
+// den Betriebskosten-Zuschlag: die Werkstatt kostet nicht doppelt Miete/Strom, nur weil zwei Leute
+// gleichzeitig an derselben Aufgabe arbeiten (anders als Lohnkosten, die je MA korrekt anfallen).
+function totalRemTaskHours(p){
+var h=0;
+for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
+for(var j=0;j<g.items.length;j++){var it=g.items[j];h+=Math.max(0,(it.planZ||0)-effectiveIstZ(it));}}
+return h;
+}
+function totalSpentTaskHours(p){
+var h=0;
+for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
+for(var j=0;j<g.items.length;j++){var it=g.items[j];h+=Math.max(0,effectiveIstZ(it));}}
+return h;
+}
+// Lohn- und Betriebskosten für ein {maId:stunden}-Objekt (remHoursByMA oder spentHoursByMA).
+// Lohnkosten bleiben bewusst je MA (mehrere Zugeordnete = mehrere bezahlte Personen); der
+// Betriebskosten-Zuschlag nutzt stattdessen taskHours (einmal je Aufgabe, s.o.), sonst würde er sich
+// bei einer Aufgabe mit zwei Zugeordneten fälschlich verdoppeln.
+function laborCostByMA(hoursByMA,taskHours){
 var maById={};(D().mitarbeiter||[]).forEach(function(m){maById[m.id]=m;});
 var wageCost=0,unknownRateHours=0,totalHours=0;
 for(var mid in hoursByMA){
@@ -622,15 +638,16 @@ if(!wage)unknownRateHours+=hoursByMA[mid];
 wageCost+=hoursByMA[mid]*wage;
 totalHours+=hoursByMA[mid];
 }
-var overheadCost=totalHours*betriebskostenProStunde();
-return{wageCost:wageCost,overheadCost:overheadCost,totalCost:wageCost+overheadCost,totalHours:totalHours,unknownRateHours:unknownRateHours};
+var overheadHours=(taskHours!=null)?taskHours:totalHours;
+var overheadCost=overheadHours*betriebskostenProStunde();
+return{wageCost:wageCost,overheadCost:overheadCost,totalCost:wageCost+overheadCost,totalHours:totalHours,overheadHours:overheadHours,unknownRateHours:unknownRateHours};
 }
 // Nur sinnvoll für art==='intern': Kapital, das in einem zurückgestellten Eigenprojekt gebunden ist.
 // Arbeitszeit-Anteil kommt aus den Ist-Stunden je Aufgabe (wie remHoursByMA), nicht aus costs()'s
 // Tagebuch/SMP-Stunden — sonst würde bereits geleistete Arbeit hier unsichtbar bleiben.
 function capitalTiedUp(p){
 var c=costs(p);
-var spentLabor=laborCostByMA(spentHoursByMA(p));
+var spentLabor=laborCostByMA(spentHoursByMA(p),totalSpentTaskHours(p));
 var ageDays=p.start?Math.floor((new Date()-new Date(p.start))/86400000):0;
 return{kaufpreis:p.kaufpreis||0,spentParts:c.pkEK,spentLabor:spentLabor.totalCost,capital:(p.kaufpreis||0)+c.pkEK+spentLabor.totalCost,ageDays:ageDays};
 }
@@ -641,9 +658,9 @@ return{kaufpreis:p.kaufpreis||0,spentParts:c.pkEK,spentLabor:spentLabor.totalCos
 function scenarioCalc(p){
 var c=costs(p);
 var remByMA=remHoursByMA(p);
-var remLabor=laborCostByMA(remByMA);
+var remLabor=laborCostByMA(remByMA,totalRemTaskHours(p));
 var spentByMA=spentHoursByMA(p);
-var spentLabor=laborCostByMA(spentByMA);
+var spentLabor=laborCostByMA(spentByMA,totalSpentTaskHours(p));
 var smpSpent=spentSMPHoursByMA(p);
 var smpLabor=laborCostByMA(smpSpent.byMA);
 var remParts=remPartsForProject(p);
@@ -651,8 +668,8 @@ var alreadySpentParts=c.pkEK;
 var alreadySpent=alreadySpentParts+spentLabor.totalCost;
 var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remLabor.totalCost;
 var res={
-remHours:remLabor.totalHours,remHoursByMA:remByMA,remWageCost:remLabor.wageCost,remOverheadCost:remLabor.overheadCost,remHoursCost:remLabor.totalCost,unknownRateHours:remLabor.unknownRateHours,
-spentHours:spentLabor.totalHours,spentHoursByMA:spentByMA,spentWageCost:spentLabor.wageCost,spentOverheadCost:spentLabor.overheadCost,spentHoursCost:spentLabor.totalCost,spentUnknownRateHours:spentLabor.unknownRateHours,
+remHours:remLabor.overheadHours,remHoursByMA:remByMA,remWageCost:remLabor.wageCost,remOverheadCost:remLabor.overheadCost,remHoursCost:remLabor.totalCost,unknownRateHours:remLabor.unknownRateHours,
+spentHours:spentLabor.overheadHours,spentHoursByMA:spentByMA,spentWageCost:spentLabor.wageCost,spentOverheadCost:spentLabor.overheadCost,spentHoursCost:spentLabor.totalCost,spentUnknownRateHours:spentLabor.unknownRateHours,
 smpSpentHours:smpLabor.totalHours,smpSpentHoursByMA:smpSpent.byMA,smpSpentCost:smpLabor.totalCost,smpSpentUnresolvedHours:smpSpent.unresolvedHours,
 betriebskostenProStunde:betriebskostenProStunde(),remParts:remParts,alreadySpent:alreadySpent,alreadySpentParts:alreadySpentParts,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
 if(p.art==="intern"){
