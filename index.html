@@ -498,12 +498,15 @@ function pstIndex(status){for(var i=0;i<PST.length;i++)if(PST[i].v===status)retu
 function effectiveMA(g,it){return(it.ma&&it.ma.length)?it.ma:(g.ma||[]);}
 function remHoursByMA(p){
 var out={};
+// Ignore ma-ids that no longer match a current Mitarbeiter (e.g. left over from a
+// delete+recreate before editing existed) so they don't get double-counted under "?".
+var validIds={};(D().mitarbeiter||[]).forEach(function(m){validIds[m.id]=true;});
 for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
 for(var j=0;j<g.items.length;j++){var it=g.items[j];
 var rem=Math.max(0,(it.planZ||0)-(it.istZ||0));
 if(rem<=0)continue;
 var ma=effectiveMA(g,it);
-for(var k=0;k<ma.length;k++)out[ma[k]]=(out[ma[k]]||0)+rem;
+for(var k=0;k<ma.length;k++){if(validIds[ma[k]])out[ma[k]]=(out[ma[k]]||0)+rem;}
 }}
 return out;
 }
@@ -1943,7 +1946,8 @@ var wrap=E(prefix+"-mapg");if(wrap){var pills=wrap.querySelectorAll(".pill");for
 function GMulti(id){var el=E(id);return el&&el.value?el.value.split(",").filter(function(x){return x;}):[];}
 function openGM(id){
 var p=curP(),g=id?p.gruppen.filter(function(x){return x.id===id;})[0]:null;
-var gma=g&&g.ma?g.ma:[];
+var validMaIds={};(D().mitarbeiter||[]).forEach(function(m){validMaIds[m.id]=true;});
+var gma=(g&&g.ma?g.ma:[]).filter(function(mid){return validMaIds[mid];});
 openM(MH(g?"Gruppe bearbeiten":"Neue Gruppe")+"<div class=\"mb2\">"
 +"<div class=\"fg\"><label class=\"fl\">Name *</label><input class=\"fi\" id=\"gm-n\" value=\""+(g?g.name:"")+"\"></div>"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Plankosten</label><input class=\"fi\" type=\"number\" id=\"gm-pk\" value=\""+(g?g.planK:"")+"\"></div>"
@@ -1966,7 +1970,8 @@ function openIM(gid,iid){
 var p=curP(),g=p.gruppen.filter(function(x){return x.id===gid;})[0];
 var it=iid?g.items.filter(function(x){return x.id===iid;})[0]:null;
 var sopt=PLST.map(function(s){return "<option"+(it&&it.status===s?" selected":"")+">"+s+"</option>";}).join("");
-var ima=it&&it.ma?it.ma:[];
+var validMaIds2={};(D().mitarbeiter||[]).forEach(function(m){validMaIds2[m.id]=true;});
+var ima=(it&&it.ma?it.ma:[]).filter(function(mid){return validMaIds2[mid];});
 openM(MH(it?"Punkt bearbeiten":"Neuer Punkt")+"<div class=\"mb2\">"
 +"<div class=\"fg\"><label class=\"fl\">Bezeichnung *</label><input class=\"fi\" id=\"im-n\" value=\""+(it?it.name:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Zustand</label><input class=\"fi\" id=\"im-z\" value=\""+(it?it.zustand:"")+"\"></div>"
