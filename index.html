@@ -482,10 +482,16 @@ var entries=getSMPTimeForProject(p),h=0;
 for(var i=0;i<entries.length;i++)h+=(entries[i].dur||0)/3600000;
 return h;
 }
+// EK/VK am Ersatzteil sind Preise JE STÜCK (siehe Feldbeschriftung im Ersatzteil-Modal) — die
+// tatsächlichen Kosten der Position sind Preis × Menge. Überall dort verwenden statt der rohen
+// t.ek/t.kosten-Felder, sonst fehlt bei Menge>1 die Multiplikation (z.B. 4 Reifen à 150€ = 600€,
+// nicht 150€).
+function partEK(t){return(t.ek||0)*(t.menge||1);}
+function partVK(t){return(t.kosten||0)*(t.menge||1);}
 function costs(p){
 var pk=0,thCR=0,thSMP=0;
-for(var i=0;i<p.teile.length;i++)pk+=p.teile[i].kosten||0;
-var pkEK=0;for(var i=0;i<p.teile.length;i++)pkEK+=p.teile[i].ek>0?p.teile[i].ek:p.teile[i].kosten||0;
+for(var i=0;i<p.teile.length;i++)pk+=partVK(p.teile[i]);
+var pkEK=0;for(var i=0;i<p.teile.length;i++)pkEK+=p.teile[i].ek>0?partEK(p.teile[i]):partVK(p.teile[i]);
 for(var i=0;i<p.tagebuch.length;i++)thCR+=parseFloat(p.tagebuch[i].zeit)||0;
 thSMP=getSMPTimeHForProject(p);
 var th=thCR+thSMP;
@@ -620,7 +626,7 @@ var cutoff=pstIndex((opts&&opts.uptoStatus)||"s5");
 var teile=p.teile.filter(function(t){return pstIndex(t.status)<=cutoff;});
 var cost=0,maxLeadDays=0,projectedReadyDate=null,unknownLead=false;
 for(var i=0;i<teile.length;i++){var t=teile[i];
-cost+=t.ek>0?t.ek:t.kosten||0;
+cost+=t.ek>0?partEK(t):partVK(t);
 if(t.bestelldatum&&t.lieferzeitTage){
 var d=new Date(t.bestelldatum);d.setDate(d.getDate()+(t.lieferzeitTage||0));
 if(!projectedReadyDate||d>projectedReadyDate)projectedReadyDate=d;
@@ -1082,7 +1088,7 @@ return "<div style=\"padding:4px 0\"><div class=\"flex fac fjb tsm\"><span>"+esc
 var remByMAGroup=hoursByMAAndGroup(p,"rem"),spentByMAGroup=hoursByMAAndGroup(p,"spent");
 var maRows=maRowsFor(sc.remHoursByMA,remByMAGroup,"cr")||"<p class=\"txs cm\">Keine Mitarbeiter zugeordnet.</p>";
 var spentMaRows=maRowsFor(sc.spentHoursByMA,spentByMAGroup,"cr")||"<p class=\"txs cm\">Noch keine Ist-Stunden erfasst.</p>";
-var partsRows=sc.remParts.teile.map(function(t){return "<tr><td>"+esc(t.name)+"</td><td>"+psb(t.status)+"</td><td>"+FMT(t.ek>0?t.ek:t.kosten||0)+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("");
+var partsRows=sc.remParts.teile.map(function(t){return "<tr><td>"+esc(t.name)+"</td><td>"+psb(t.status)+"</td><td>"+FMT(t.ek>0?partEK(t):partVK(t))+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("");
 var groups=groupBudgetProgress(p);
 var groupRows=groups.map(function(gr){
 var scale=Math.max(gr.planZ,gr.istZ,0.01);
@@ -1187,7 +1193,7 @@ var statusCol=gr.overrunH>0?"#c41230":(gr.openH>0?"#d97706":"#3d7a52");
 return "<tr><td style='padding:6px'>"+esc(gr.name)+(gr.ma.length?" <span style='color:#888;font-size:10px'>("+esc(gr.ma.join(", "))+")</span>":"")+"</td>"
 +"<td>"+FMTH(gr.planZ)+"</td><td>"+FMTH(gr.istZ)+"</td><td style='color:"+statusCol+";font-weight:600'>"+statusTxt+"</td></tr>";
 }).join("")||"<tr><td colspan='4' style='padding:6px;color:#888'>Keine Baugruppen geplant.</td></tr>";
-var partsRows=sc.remParts.teile.map(function(t){return "<tr><td style='padding:6px'>"+esc(t.name)+"</td><td>"+esc(t.status)+"</td><td style='text-align:right'>"+FMT_EUR(t.ek>0?t.ek:t.kosten||0)+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("")||"<tr><td colspan='4' style='padding:6px;color:#888'>Keine offenen Teile.</td></tr>";
+var partsRows=sc.remParts.teile.map(function(t){return "<tr><td style='padding:6px'>"+esc(t.name)+"</td><td>"+esc(t.status)+"</td><td style='text-align:right'>"+FMT_EUR(t.ek>0?partEK(t):partVK(t))+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("")||"<tr><td colspan='4' style='padding:6px;color:#888'>Keine offenen Teile.</td></tr>";
 var body="<div style='background:#1a1715;color:#fff;padding:8px;border-radius:5px;margin-bottom:12px;font-size:10px'>VERTRAULICH &bull; CHEFSACHE</div>"
 +"<h1 style='color:#c41230'>"+esc(p.name)+" &mdash; Szenariorechner</h1>"
 +"<p style='color:#888;font-size:11px'>"+(v?esc(v.marke+" "+v.modell)+" &bull; ":"")+esc(p.status)+" &bull; "+new Date().toLocaleDateString("de-DE")+"</p>"
@@ -1626,14 +1632,14 @@ var p=curP(),teile=p.teile.slice(),totK=0;
   var rechHTML=rProjTeileRecherche(p.name);
 if(APP.pf)teile=teile.filter(function(t){return t.status===APP.pf;});
 if(APP.ps){var q=APP.ps.toLowerCase();teile=teile.filter(function(t){return(t.name+t.nr+t.gr+t.lief).toLowerCase().indexOf(q)>=0;});}
-for(var i=0;i<teile.length;i++)totK+=teile[i].kosten||0;
+for(var i=0;i<teile.length;i++)totK+=partVK(teile[i]);
 var rows="";
 for(var i=0;i<teile.length;i++){
 var t=teile[i];
 rows+="<tr><td><div class=\"tsm fw\">"+t.name+"</div><div class=\"txs cm\">"+t.nr+" &bull; "+t.gr+"</div></td>"
 +"<td class=\"ff fw\" style=\"text-align:center;font-size:14px\">"+t.menge+"</td>"
 +"<td>"+psb(t.status)+"</td><td class=\"tsm cm\">"+(t.lief||"&mdash;")+"</td>"
-+(function(){var _v=t.kosten>0?FMT(t.kosten):"&mdash;";var _e=t.ek>0?" <small style=\"font-size:9px;color:#8a8278\">EK:"+FMT(t.ek)+"</small>":"";return "<td style=\"text-align:right;font-size:12px\">"+_v+_e+"</td>";})()
++(function(){var _v=t.kosten>0?FMT(partVK(t)):"&mdash;";var _e=t.ek>0?" <small style=\"font-size:9px;color:#8a8278\">EK:"+FMT(partEK(t))+"</small>":"";var _m=t.menge>1?" <small style=\"font-size:9px;color:#8a8278\">("+t.menge+"&times;)</small>":"";return "<td style=\"text-align:right;font-size:12px\">"+_v+_e+_m+"</td>";})()
 +"<td><div class=\"flex g2p\" style=\"justify-content:flex-end\"><button class=\"bic\" data-action=\"openTM\" data-id=\""+t.id+"\">&#9998;</button>"
 +"<button class=\"bic\" data-action=\"delT\" data-id=\""+t.id+"\">&#128465;</button></div></td></tr>";
 }
@@ -2370,14 +2376,21 @@ openM(MH(t?"Ersatzteil bearbeiten":"Neues Ersatzteil")
 +"<div class=\"fg\"><label class=\"fl\">Gruppe</label><input class=\"fi\" id=\"tm-gr\" list=\"tmgl\" value=\""+(t?t.gr:"")+"\"><datalist id=\"tmgl\">"+gr.map(function(g){return "<option value=\""+g+"\">"; }).join("")+"</datalist></div></div>"
 +"<div class=\"fg\"><label class=\"fl\">Bezeichnung *</label><input class=\"fi\" id=\"tm-n\" value=\""+(t?t.name:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Status</label><div class=\"pillg\" id=\"tm-spg\">"+pills+"</div><input type=\"hidden\" id=\"tm-st\" value=\""+(t?t.status:"s0")+"\"></div>"
-+"<div class=\"frow3\"><div class=\"fg\"><label class=\"fl\">Menge</label><input class=\"fi\" type=\"number\" id=\"tm-me\" value=\""+(t?t.menge:1)+"\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">EK (Einkauf)</label><input class=\"fi\" type=\"number\" id=\"tm-ek\" value=\""+(t&&t.ek?t.ek:"")+"\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">VK (Verkauf)</label><input class=\"fi\" type=\"number\" id=\"tm-ko\" value=\""+(t?t.kosten:"")+"\"></div></div>"
++"<div class=\"frow3\"><div class=\"fg\"><label class=\"fl\">Menge</label><input class=\"fi\" type=\"number\" id=\"tm-me\" value=\""+(t?t.menge:1)+"\" oninput=\"updateTMTotal()\"></div>"
++"<div class=\"fg\"><label class=\"fl\">EK je St&uuml;ck (Einkauf)</label><input class=\"fi\" type=\"number\" id=\"tm-ek\" value=\""+(t&&t.ek?t.ek:"")+"\" oninput=\"updateTMTotal()\"></div>"
++"<div class=\"fg\"><label class=\"fl\">VK je St&uuml;ck (Verkauf)</label><input class=\"fi\" type=\"number\" id=\"tm-ko\" value=\""+(t?t.kosten:"")+"\" oninput=\"updateTMTotal()\"></div></div>"
++"<div class=\"txs cm mb2\" id=\"tm-tot\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Lieferant</label><input class=\"fi\" id=\"tm-li\" value=\""+(t?t.lief:"")+"\"></div>"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Bestelldatum</label><input class=\"fi\" type=\"date\" id=\"tm-bd\" value=\""+(t?t.bestelldatum||"":"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Lieferzeit (Tage)</label><input class=\"fi\" type=\"number\" id=\"tm-lz\" min=\"0\" value=\""+(t&&t.lieferzeitTage?t.lieferzeitTage:"")+"\"></div></div>"
 +"<div class=\"fg\"><label class=\"fl\">Notizen</label><textarea class=\"fta\" id=\"tm-no\">"+(t?t.notiz:"")+"</textarea></div></div>"
 +MF("saveT",id||""),true);
+updateTMTotal();
+}
+function updateTMTotal(){
+var el=E("tm-tot");if(!el)return;
+var me=GF("tm-me")||1,ek=GF("tm-ek"),vk=GF("tm-ko");
+el.innerHTML="Gesamt: "+FMT(vk*me)+" VK"+(ek?" &bull; "+FMT(ek*me)+" EK":"")+" ("+me+"&nbsp;&times;&nbsp;Stückpreis)";
 }
 function selPS(val){E("tm-st").value=val;var pills=E("tm-spg").querySelectorAll(".pill");for(var i=0;i<pills.length;i++)pills[i].classList.toggle("sel",pills[i].getAttribute("data-id")===val);}
 function saveT(id){
@@ -2487,10 +2500,10 @@ if(teile.length){
 addH2("Ersatzteile ("+teile.length+")");
 var teileRows=teile.map(function(t2){
 var ps=null;for(var pi=0;pi<PST.length;pi++){if(PST[pi].v===t2.status){ps=PST[pi];break;}}
-return [t2.nr||"",t2.name||"",t2.gr||"",ps?ps.l:(t2.status||""),t2.kosten||0];
+return [t2.nr||"",t2.name||"",t2.gr||"",ps?ps.l:(t2.status||""),t2.menge||1,partVK(t2)];
 });
-var tot=teile.reduce(function(s,t3){return s+(t3.kosten||0);},0);
-addTable(["Nr.","Bezeichnung","Gruppe","Status","Kosten (VK)"],teileRows,["Gesamt","","","",tot]);
+var tot=teile.reduce(function(s,t3){return s+partVK(t3);},0);
+addTable(["Nr.","Bezeichnung","Gruppe","Status","Menge","Kosten (VK)"],teileRows,["Gesamt","","","","",tot]);
 }
 if(tagebuch.length){
 addH2("Tagebuch ("+tagebuch.length+" Einträge)");
