@@ -1687,7 +1687,8 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ag-rolle\" placeholder=\"z.B. Kfz-Meister\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">€/h</label><input class=\"fi\" type=\"number\" id=\"ag-rate\" value=\"90\"></div></div>"
 +"<button class=\"btn btn-p btn-sm\" onclick=\"addAG()\">+ Arbeitsgang</button></div>"
-+"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128101; Mitarbeiter</div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128101; Mitarbeiter (Fertigungsplanung)</div>"
++"<div class=\"txs cm mb2\">Diese Liste wird für die Baugruppen-/Aufgaben-Zuordnung in Fertigungsplanung &amp; Szenariorechner genutzt (separat vom „Mitarbeiterstamm“ unter Stammdaten).</div>"
 +(maRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+maRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Mitarbeiter.</p>")
 +"<div class=\"frow3 mb2\"><div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Rolle</label><input class=\"fi\" id=\"ma-rolle\"></div>"
@@ -3348,7 +3349,7 @@ return '<div id="bericht-content">'
 +'<div class="rep-section"><h3>📋 Detaileinträge ('+data.length+')</h3>'+detRows+'</div>'
 +'</div>';
 }
-function renderBericht(){ var pg=document.getElementById('pg'); if(pg&&TAB==='bericht') pg.innerHTML=rBericht(); }
+function renderBericht(){ var pg=document.getElementById('pg'); if(pg&&APP.view==='bericht') pg.innerHTML=rBericht(); }
 function printBericht(){
 var content=document.getElementById('bericht-content');
 if(!content){alert('Kein Bericht geladen.');return;}
@@ -3560,12 +3561,12 @@ if(!proj){alert('Bitte Projektname eingeben.');return;}
 var fullProj=kunde?(kunde+' / '+proj):proj;
 DB.kundenprojekte.push({id:uid(),kunde:kunde,proj:fullProj,rate:rate,note:note});
 saveDB();
-var pg=document.getElementById('pg');if(pg&&TAB==='stamm')pg.innerHTML=rStamm();
+var pg=document.getElementById('pg');if(pg&&APP.view==='stamm')pg.innerHTML=rStamm();
 }
 function delKP(i){
 if(!confirm('Kundenprojekt löschen?'))return;
 DB.kundenprojekte.splice(i,1);saveDB();
-var pg=document.getElementById('pg');if(pg&&TAB==='stamm')pg.innerHTML=rStamm();
+var pg=document.getElementById('pg');if(pg&&APP.view==='stamm')pg.innerHTML=rStamm();
 }
 function addAG(){
 var name=document.getElementById('ag-name')?document.getElementById('ag-name').value.trim():'';
@@ -3574,7 +3575,7 @@ var rate=parseFloat(document.getElementById('ag-rate')?document.getElementById('
 if(!name){alert('Bitte Arbeitsgang-Name eingeben.');return;}
 DB.arbeitsgaenge.push({id:uid(),name:name,kategorie:kat,rate:rate});
 saveDB();
-var pg=document.getElementById('pg');if(pg&&TAB==='stamm')pg.innerHTML=rStamm();
+var pg=document.getElementById('pg');if(pg&&APP.view==='stamm')pg.innerHTML=rStamm();
 }
 
 function delRMAG(i){
@@ -3585,7 +3586,7 @@ function delRMAG(i){
 function delAG(i){
 if(!confirm('Arbeitsgang löschen?'))return;
 DB.arbeitsgaenge.splice(i,1);saveDB();
-var pg=document.getElementById('pg');if(pg&&TAB==='stamm')pg.innerHTML=rStamm();
+var pg=document.getElementById('pg');if(pg&&APP.view==='stamm')pg.innerHTML=rStamm();
 }
 function addMA(){
 var name=document.getElementById('ma-name')?document.getElementById('ma-name').value.trim():'';
@@ -3596,12 +3597,12 @@ if(!name){alert('Bitte Name eingeben.');return;}
 for(var i=0;i<DB.mitarbeiter.length;i++) if(DB.mitarbeiter[i].name===name){alert('Mitarbeiter bereits vorhanden.');return;}
 DB.mitarbeiter.push({id:uid(),name:name,rolle:rolle,rate:rate,tel:tel});
 saveDB();
-var pg=document.getElementById('pg');if(pg&&TAB==='stamm')pg.innerHTML=rStamm();
+var pg=document.getElementById('pg');if(pg&&APP.view==='stamm')pg.innerHTML=rStamm();
 }
 function delMA(i){
 if(!confirm('Mitarbeiter löschen?'))return;
 DB.mitarbeiter.splice(i,1);saveDB();
-var pg=document.getElementById('pg');if(pg&&TAB==='stamm')pg.innerHTML=rStamm();
+var pg=document.getElementById('pg');if(pg&&APP.view==='stamm')pg.innerHTML=rStamm();
 }
 // CR-side Mitarbeiterstamm (APP.data.mitarbeiter) — separate from the SMP-side addMA()/delMA() above,
 // which write to APP.smp.mitarbeiter. Needed so employees can actually be assigned to Baugruppen/Aufgaben.
