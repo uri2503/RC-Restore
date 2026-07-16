@@ -511,6 +511,21 @@ for(var k=0;k<ma.length;k++){if(validIds[ma[k]])out[ma[k]]=(out[ma[k]]||0)+rem;}
 return out;
 }
 function remHoursForMA(p,maId){return remHoursByMA(p)[maId]||0;}
+// Stunden, die je Mitarbeiter laut Ist-Zeit auf den Aufgaben bereits geleistet wurden — separate
+// Datenquelle von costs()'s Tagebuch/SMP-Stunden, aber die, die planZ/istZ (und damit auch
+// remHoursByMA) tatsächlich zugrunde liegt, daher hier für eine konsistente Kostenbetrachtung genutzt.
+function spentHoursByMA(p){
+var out={};
+var validIds={};(D().mitarbeiter||[]).forEach(function(m){validIds[m.id]=true;});
+for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
+for(var j=0;j<g.items.length;j++){var it=g.items[j];
+var spent=Math.max(0,it.istZ||0);
+if(spent<=0)continue;
+var ma=effectiveMA(g,it);
+for(var k=0;k<ma.length;k++){if(validIds[ma[k]])out[ma[k]]=(out[ma[k]]||0)+spent;}
+}}
+return out;
+}
 // "Noch offen" = Status vor s6 (Einbaubereit); Teile ohne Bestelldatum/Lieferzeit werden als unknownLead markiert statt ignoriert.
 function remPartsForProject(p,opts){
 var cutoff=pstIndex((opts&&opts.uptoStatus)||"s5");
@@ -551,13 +566,6 @@ return{key:wt.key,label:wt.label,active:active,capacity:capacity,feasible:capaci
 });
 return{byMA:byMA,bays:bays};
 }
-// Nur sinnvoll für art==='intern': Kapital, das in einem zurückgestellten Eigenprojekt gebunden ist.
-function capitalTiedUp(p){
-var c=costs(p);
-var ageDays=p.start?Math.floor((new Date()-new Date(p.start))/86400000):0;
-return{kaufpreis:p.kaufpreis||0,spentParts:c.pkEK,spentLabor:c.tk,capital:(p.kaufpreis||0)+c.pkEK+c.tk,ageDays:ageDays};
-}
-// Szenariorechner: Restkosten bis Fertigstellung, bei internen Projekten zusätzlich Marge gegen Zielverkaufspreis.
 // Miete+Strom+Allg.Kosten aus den Betriebskosten-Einstellungen, je Arbeitsstunde. Personalkosten
 // bleiben hier aussen vor, da die echten MA-Stundensätze (mitarbeiter[].rate) bereits die
 // tatsächlichen Lohnkosten abbilden und sonst doppelt gerechnet würden.
@@ -565,26 +573,49 @@ function betriebskostenProStunde(){
 var s=D().settings||{};
 return (+(s.miete||0))+(+(s.strom||0))+(+(s.agk||0));
 }
-function scenarioCalc(p){
-var c=costs(p);
-var byMA=remHoursByMA(p),remH=0;for(var k in byMA)remH+=byMA[k];
+// Lohn- und Betriebskosten für ein {maId:stunden}-Objekt (remHoursByMA oder spentHoursByMA),
+// bewusst getrennt gehalten (nicht je MA verrechnet), damit der reine Personaleinsatz je
+// Mitarbeiter nicht durch den Gemeinkosten-Anteil verwässert wird.
+function laborCostByMA(hoursByMA){
 var maById={};(D().mitarbeiter||[]).forEach(function(m){maById[m.id]=m;});
-var bk=betriebskostenProStunde();
-// Lohnkosten und Betriebskosten-Zuschlag bewusst getrennt gehalten (nicht je MA verrechnet),
-// damit der reine Personaleinsatz je Mitarbeiter nicht durch den Gemeinkosten-Anteil verwässert wird.
-var remWageCost=0,unknownRateHours=0;
-for(var mid in byMA){
+var wageCost=0,unknownRateHours=0,totalHours=0;
+for(var mid in hoursByMA){
 var m=maById[mid];
 var wage=(m&&m.rate>0)?m.rate:0;
-if(!wage)unknownRateHours+=byMA[mid];
-remWageCost+=byMA[mid]*wage;
+if(!wage)unknownRateHours+=hoursByMA[mid];
+wageCost+=hoursByMA[mid]*wage;
+totalHours+=hoursByMA[mid];
 }
-var remOverheadCost=remH*bk;
-var remHoursCost=remWageCost+remOverheadCost;
+var overheadCost=totalHours*betriebskostenProStunde();
+return{wageCost:wageCost,overheadCost:overheadCost,totalCost:wageCost+overheadCost,totalHours:totalHours,unknownRateHours:unknownRateHours};
+}
+// Nur sinnvoll für art==='intern': Kapital, das in einem zurückgestellten Eigenprojekt gebunden ist.
+// Arbeitszeit-Anteil kommt aus den Ist-Stunden je Aufgabe (wie remHoursByMA), nicht aus costs()'s
+// Tagebuch/SMP-Stunden — sonst würde bereits geleistete Arbeit hier unsichtbar bleiben.
+function capitalTiedUp(p){
+var c=costs(p);
+var spentLabor=laborCostByMA(spentHoursByMA(p));
+var ageDays=p.start?Math.floor((new Date()-new Date(p.start))/86400000):0;
+return{kaufpreis:p.kaufpreis||0,spentParts:c.pkEK,spentLabor:spentLabor.totalCost,capital:(p.kaufpreis||0)+c.pkEK+spentLabor.totalCost,ageDays:ageDays};
+}
+// Szenariorechner: Restkosten bis Fertigstellung, bei internen Projekten zusätzlich Marge gegen Zielverkaufspreis.
+// "Bereits investiert" nutzt für die Arbeitszeit bewusst die Ist-Stunden je Aufgabe (spentHoursByMA),
+// nicht costs()'s Tagebuch/SMP-Zahlen — sonst zählt bereits erledigte Arbeit hier nirgends mit,
+// obwohl sie in den Reststunden schon korrekt abgezogen wird (planZ - istZ).
+function scenarioCalc(p){
+var c=costs(p);
+var remByMA=remHoursByMA(p);
+var remLabor=laborCostByMA(remByMA);
+var spentByMA=spentHoursByMA(p);
+var spentLabor=laborCostByMA(spentByMA);
 var remParts=remPartsForProject(p);
-var alreadySpent=c.pkEK+c.tk;
-var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remHoursCost;
-var res={remHours:remH,remHoursByMA:byMA,remWageCost:remWageCost,remOverheadCost:remOverheadCost,remHoursCost:remHoursCost,unknownRateHours:unknownRateHours,betriebskostenProStunde:bk,remParts:remParts,alreadySpent:alreadySpent,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
+var alreadySpentParts=c.pkEK;
+var alreadySpent=alreadySpentParts+spentLabor.totalCost;
+var totalCostToComplete=(p.kaufpreis||0)+alreadySpent+remParts.cost+remLabor.totalCost;
+var res={
+remHours:remLabor.totalHours,remHoursByMA:remByMA,remWageCost:remLabor.wageCost,remOverheadCost:remLabor.overheadCost,remHoursCost:remLabor.totalCost,unknownRateHours:remLabor.unknownRateHours,
+spentHours:spentLabor.totalHours,spentHoursByMA:spentByMA,spentWageCost:spentLabor.wageCost,spentOverheadCost:spentLabor.overheadCost,spentHoursCost:spentLabor.totalCost,spentUnknownRateHours:spentLabor.unknownRateHours,
+betriebskostenProStunde:betriebskostenProStunde(),remParts:remParts,alreadySpent:alreadySpent,alreadySpentParts:alreadySpentParts,kaufpreis:p.kaufpreis||0,totalCostToComplete:totalCostToComplete};
 if(p.art==="intern"){
 res.zielVK=p.zielVK||0;
 res.margin=res.zielVK-totalCostToComplete;
@@ -883,13 +914,24 @@ var pid=GV("sc-proj"),el=E("sc-result");if(!el)return;
 var p=getP(pid);if(!p){el.innerHTML="<div class=\"empty\"><p>Kein Projekt gewählt.</p></div>";return;}
 var d=D(),sc=scenarioCalc(p);
 var maById={};for(var i=0;i<(d.mitarbeiter||[]).length;i++)maById[d.mitarbeiter[i].id]=d.mitarbeiter[i];
-var maRows=Object.keys(sc.remHoursByMA).map(function(mid){
+function maRowsFor(hoursByMA,unknownCls){
+return Object.keys(hoursByMA).map(function(mid){
 var m=maById[mid],wage=(m&&m.rate>0)?m.rate:0;
 var rateTxt=wage?(wage+"&euro;/h"):"kein Satz hinterlegt";
-return "<div class=\"flex fac fjb tsm\" style=\"padding:4px 0\"><span>"+esc((m&&m.name)||"?")+"</span><span class=\""+(wage?"":"cr")+"\">"+FMTH(sc.remHoursByMA[mid])+" &times; "+rateTxt+"</span></div>";
-}).join("")||"<p class=\"txs cm\">Keine Mitarbeiter zugeordnet.</p>";
+return "<div class=\"flex fac fjb tsm\" style=\"padding:4px 0\"><span>"+esc((m&&m.name)||"?")+"</span><span class=\""+(wage?"":unknownCls)+"\">"+FMTH(hoursByMA[mid])+" &times; "+rateTxt+"</span></div>";
+}).join("");
+}
+var maRows=maRowsFor(sc.remHoursByMA,"cr")||"<p class=\"txs cm\">Keine Mitarbeiter zugeordnet.</p>";
+var spentMaRows=maRowsFor(sc.spentHoursByMA,"cr")||"<p class=\"txs cm\">Noch keine Ist-Stunden erfasst.</p>";
 var partsRows=sc.remParts.teile.map(function(t){return "<tr><td>"+esc(t.name)+"</td><td>"+psb(t.status)+"</td><td>"+FMT(t.ek>0?t.ek:t.kosten||0)+"</td><td>"+(t.bestelldatum&&t.lieferzeitTage?t.lieferzeitTage+"T":"unbekannt")+"</td></tr>";}).join("");
 var html="<div class=\"g2\"><div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Bereits geleistete Stunden je Mitarbeiter</div>"
++"<div class=\"txs cm mb2\">Aus den Ist-Stunden je Aufgabe — das, was bereits investiert wurde.</div>"
++spentMaRows
++(sc.spentUnknownRateHours>0?"<div class=\"txs cr mt2\">&#9888; "+FMTH(sc.spentUnknownRateHours)+" ohne hinterlegten Stundensatz.</div>":"")
++"<div class=\"divid\"></div><div class=\"flex fjb tsm\"><span>Lohnkosten bisher</span><span>"+FMT(sc.spentWageCost)+"</span></div>"
++"<div class=\"flex fjb tsm\"><span>Betriebskosten-Zuschlag ("+FMTH(sc.spentHours)+" &times; "+FMT(sc.betriebskostenProStunde)+"/h)</span><span>"+FMT(sc.spentOverheadCost)+"</span></div>"
++"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.spentHours)+")</span><span>"+FMT(sc.spentHoursCost)+"</span></div></div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Reststunden je Mitarbeiter</div>"
 +"<div class=\"txs cm mb2\">Reiner Personaleinsatz zum echten internen Stundensatz — Betriebskosten separat unten.</div>"
 +maRows
@@ -906,7 +948,9 @@ var html="<div class=\"g2\"><div>"
 +"<div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">Kosten bis Fertigstellung</div>"
 +"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Kaufpreis Fahrzeug</span><span>"+FMT(sc.kaufpreis)+"</span></div>"
-+"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Bereits investiert (Teile+Zeit)</span><span>"+FMT(sc.alreadySpent)+"</span></div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Bereits investiert — Ersatzteile</span><span>"+FMT(sc.alreadySpentParts)+"</span></div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Bereits investiert — Arbeitszeit (Lohn)</span><span>"+FMT(sc.spentWageCost)+"</span></div>"
++"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Bereits investiert — Arbeitszeit (Betriebskosten)</span><span>"+FMT(sc.spentOverheadCost)+"</span></div>"
 +"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Ersatzteile</span><span>"+FMT(sc.remParts.cost)+"</span></div>"
 +"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Arbeitszeit (Lohn)</span><span>"+FMT(sc.remWageCost)+"</span></div>"
 +"<div class=\"flex fjb tsm\" style=\"padding:3px 0\"><span>Rest-Arbeitszeit (Betriebskosten)</span><span>"+FMT(sc.remOverheadCost)+"</span></div>"
