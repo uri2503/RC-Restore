@@ -514,6 +514,33 @@ function effectiveIstZ(it){
 var sh=stempeluhrHoursForItem(it.id);
 return sh>0?sh:(it.istZ||0);
 }
+// WER die bereits geleisteten Stunden einer Aufgabe tatsächlich gearbeitet hat. Bevorzugt die echten
+// Stempeluhr/Manuell-erfassen-Einträge (jeder trägt seinen eigenen Mitarbeiternamen, e.ma) — das ist
+// die tatsächliche Zuordnung, unabhängig davon wer in der Planung als "Zuständiger Mitarbeiter"
+// eingetragen ist (die beiden Listen werden unabhängig voneinander gepflegt und laufen leicht
+// auseinander). Fällt nur auf die Planungs-Zuordnung (effectiveMA) zurück, wenn für die Aufgabe gar
+// keine Stempeluhr-Daten existieren (reines manuelles Ist-Zeit-Feld) — spiegelt exakt effectiveIstZ()s
+// eigene Priorität, damit Stunden-Summe und MA-Zuordnung nie auseinanderlaufen. Namens-Abgleich wie
+// spentSMPHoursByMA(), da Stempeluhr-Einträge den SMP-Mitarbeiternamen tragen, nicht die CR-ID.
+function spentAttributionForItem(g,it){
+var byNameLower=null,byMA={},unresolved=0,sh=0;
+for(var i=0;i<APP.smp.zeit.length;i++){
+var e=APP.smp.zeit[i];if(e.itemId!==it.id)continue;
+var h=(e.dur||0)/3600000;if(h<=0)continue;
+sh+=h;
+if(!byNameLower){byNameLower={};(D().mitarbeiter||[]).forEach(function(m){byNameLower[(m.name||"").toLowerCase()]=m;});}
+var name=(e.ma||((e.note||"").match(/\[([^\]]+)\]$/)||["",""])[1]||"").trim();
+var m=name?byNameLower[name.toLowerCase()]:null;
+if(m)byMA[m.id]=(byMA[m.id]||0)+h;else unresolved+=h;
+}
+if(sh>0)return{byMA:byMA,unresolved:unresolved};
+var ist=Math.max(0,it.istZ||0);
+if(ist<=0)return{byMA:{},unresolved:0};
+var ma=effectiveMA(g,it);
+if(!ma.length)return{byMA:{},unresolved:ist};
+var byMA2={};ma.forEach(function(mid){byMA2[mid]=ist;});
+return{byMA:byMA2,unresolved:0};
+}
 function remHoursByMA(p){
 var out={};
 // Ignore ma-ids that no longer match a current Mitarbeiter (e.g. left over from a
@@ -537,10 +564,8 @@ var out={};
 var validIds={};(D().mitarbeiter||[]).forEach(function(m){validIds[m.id]=true;});
 for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
 for(var j=0;j<g.items.length;j++){var it=g.items[j];
-var spent=Math.max(0,effectiveIstZ(it));
-if(spent<=0)continue;
-var ma=effectiveMA(g,it);
-for(var k=0;k<ma.length;k++){if(validIds[ma[k]])out[ma[k]]=(out[ma[k]]||0)+spent;}
+var attr=spentAttributionForItem(g,it);
+for(var mid in attr.byMA){if(validIds[mid])out[mid]=(out[mid]||0)+attr.byMA[mid];}
 }}
 return out;
 }
@@ -552,13 +577,22 @@ var out={};
 var validIds={};(D().mitarbeiter||[]).forEach(function(m){validIds[m.id]=true;});
 for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
 for(var j=0;j<g.items.length;j++){var it=g.items[j];
-var h=mode==="rem"?Math.max(0,(it.planZ||0)-effectiveIstZ(it)):Math.max(0,effectiveIstZ(it));
+if(mode==="rem"){
+var h=Math.max(0,(it.planZ||0)-effectiveIstZ(it));
 if(h<=0)continue;
 var ma=effectiveMA(g,it);
 for(var k=0;k<ma.length;k++){if(!validIds[ma[k]])continue;
 out[ma[k]]=out[ma[k]]||{};
 out[ma[k]][g.name]=(out[ma[k]][g.name]||0)+h;
-}}}
+}
+}else{
+var attr=spentAttributionForItem(g,it);
+for(var mid in attr.byMA){if(!validIds[mid])continue;
+out[mid]=out[mid]||{};
+out[mid][g.name]=(out[mid][g.name]||0)+attr.byMA[mid];
+}
+}
+}}
 return out;
 }
 // Stunden, die zwar auf dieses Projekt gebucht wurden (Stempeluhr/Manuell erfassen), aber OHNE
@@ -642,17 +676,25 @@ for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
 for(var j=0;j<g.items.length;j++){var it=g.items[j];h+=Math.max(0,effectiveIstZ(it));}}
 return h;
 }
-// Anteil von totalRemTaskHours()/totalSpentTaskHours(), der auf Aufgaben OHNE zugeordneten Mitarbeiter
-// entfällt — zählt zwar korrekt in den Betriebskosten mit (die Werkstatt kostet auch bei nicht
+// Anteil von totalRemTaskHours()/totalSpentTaskHours(), der KEINEM Mitarbeiter zugerechnet werden
+// konnte — zählt zwar korrekt in den Betriebskosten mit (die Werkstatt kostet auch bei nicht
 // zugeordneter Arbeit), taucht aber in keiner "je Mitarbeiter"-Aufstellung auf. Ohne diesen Hinweis
 // sieht die Betriebskosten-Stundenzahl dort größer aus als die Summe der gelisteten MA-Stunden, was
 // wie ein Rechenfehler wirkt statt wie eine fehlende MA-Zuordnung.
+// "rem" (noch offen) hat naturgemäß nur die Planungs-Zuordnung als Signal (die Arbeit ist noch nicht
+// passiert). "spent" (bereits geleistet) nutzt spentAttributionForItem() — echte
+// Stempeluhr/Manuell-erfassen-Zuordnung bevorzugt vor der Planungs-Zuordnung, siehe dort.
 function unassignedTaskHours(p,mode){
 var h=0;
+if(mode==="spent"){
+for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
+for(var j=0;j<g.items.length;j++){h+=spentAttributionForItem(g,g.items[j]).unresolved;}}
+return h;
+}
 for(var i=0;i<p.gruppen.length;i++){var g=p.gruppen[i];
 for(var j=0;j<g.items.length;j++){var it=g.items[j];
 if(effectiveMA(g,it).length>0)continue;
-h+=mode==="rem"?Math.max(0,(it.planZ||0)-effectiveIstZ(it)):Math.max(0,effectiveIstZ(it));
+h+=Math.max(0,(it.planZ||0)-effectiveIstZ(it));
 }}
 return h;
 }
@@ -723,11 +765,11 @@ for(var j=0;j<g.items.length;j++){var it=g.items[j];
 planZ+=(it.planZ||0);
 var ist=effectiveIstZ(it);
 istZ+=ist;
-if(ist>0){var ma=effectiveMA(g,it);
-for(var k=0;k<ma.length;k++){var m=maById[ma[k]];if(!m)continue;
-wageSpentSum+=ist*(m.rate>0?m.rate:0);wageHoursSum+=ist;
-if(!seen[m.id]){seen[m.id]=1;maNames.push(m.name);}
-}}
+var attr=spentAttributionForItem(g,it);
+for(var mid in attr.byMA){var m=maById[mid];if(!m)continue;
+wageSpentSum+=attr.byMA[mid]*(m.rate>0?m.rate:0);wageHoursSum+=attr.byMA[mid];
+if(!seen[mid]){seen[mid]=1;maNames.push(m.name);}
+}
 }
 var doneH=Math.min(planZ,istZ),openH=Math.max(0,planZ-istZ),overrunH=Math.max(0,istZ-planZ);
 var avgWage=wageHoursSum>0?(wageSpentSum/wageHoursSum):0;
@@ -1073,7 +1115,7 @@ var html=groupsSection+"<div class=\"g2\"><div>"
 +(sc.spentUnknownRateHours>0?"<div class=\"txs cr mt2\">&#9888; "+FMTH(sc.spentUnknownRateHours)+" ohne hinterlegten Stundensatz.</div>":"")
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm\"><span>Lohnkosten bisher</span><span>"+FMT(sc.spentWageCost)+"</span></div>"
 +"<div class=\"flex fjb tsm\"><span>Betriebskosten-Zuschlag ("+FMTH(sc.spentHours)+" &times; "+FMT(sc.betriebskostenProStunde)+"/h)</span><span>"+FMT(sc.spentOverheadCost)+"</span></div>"
-+(sc.spentUnassignedHours>0?"<div class=\"txs cm\" style=\"padding-left:10px\">davon "+FMTH(sc.spentUnassignedHours)+" auf Aufgaben ohne zugeordneten Mitarbeiter &mdash; z&auml;hlen hier mit, tauchen oben nicht auf</div>":"")
++(sc.spentUnassignedHours>0?"<div class=\"txs cm\" style=\"padding-left:10px\">davon "+FMTH(sc.spentUnassignedHours)+" ohne zuordenbaren Mitarbeiter (Stempeluhr-Name unbekannt oder keine Zuweisung) &mdash; z&auml;hlen hier mit, tauchen oben nicht auf</div>":"")
 +"<div class=\"divid\"></div><div class=\"flex fjb tsm fw\"><span>Gesamt ("+FMTH(sc.spentHours)+")</span><span>"+FMT(sc.spentHoursCost)+"</span></div>"
 +(sc.smpSpentHours>0?"<div class=\"divid\"></div><div class=\"txs cm\" style=\"background:var(--bg);padding:8px;border-radius:6px\">&#9203; <strong>"+FMTH(sc.smpSpentHours)+"</strong> über Stempeluhr/Manuell erfasst, aber ohne Aufgaben-Zuordnung ("+FMT(sc.smpSpentCost)+" inkl. Betriebskosten) — zählen deshalb <strong>nicht</strong> in der Summe oben. Bitte bei diesen Einträgen eine Aufgabe nachtragen."+(sc.smpSpentUnresolvedHours>0?" ("+FMTH(sc.smpSpentUnresolvedHours)+" davon zusätzlich ohne zuordenbaren Mitarbeiter.)":"")+"</div>":"")
 +"</div>"
@@ -1155,7 +1197,7 @@ var body="<div style='background:#1a1715;color:#fff;padding:8px;border-radius:5p
 +"<table style='width:100%;border-collapse:collapse;font-size:12px'><thead><tr style='background:#f0ede8'><th style='padding:6px;text-align:left'>Mitarbeiter</th><th style='text-align:left'>Arbeitsgang</th><th>Std.</th><th>Satz</th><th style='text-align:right'>Kosten</th></tr></thead><tbody>"+maTable(sc.spentHoursByMA,spentByMAGroup)+"</tbody>"
 +"<tfoot><tr style='background:#f5f5f5;font-weight:700'><td colspan='4' style='padding:6px'>Lohnkosten bisher</td><td style='text-align:right'>"+FMT_EUR(sc.spentWageCost)+"</td></tr>"
 +"<tr><td colspan='4' style='padding:6px'>Betriebskosten-Zuschlag ("+FMTH(sc.spentHours)+" &times; "+FMT_EUR(sc.betriebskostenProStunde)+"/h)</td><td style='text-align:right'>"+FMT_EUR(sc.spentOverheadCost)+"</td></tr>"
-+(sc.spentUnassignedHours>0?"<tr><td colspan='4' style='padding:2px 6px 6px 20px;font-weight:400;color:#888;font-size:11px'>davon "+FMTH(sc.spentUnassignedHours)+" auf Aufgaben ohne zugeordneten Mitarbeiter</td><td></td></tr>":"")
++(sc.spentUnassignedHours>0?"<tr><td colspan='4' style='padding:2px 6px 6px 20px;font-weight:400;color:#888;font-size:11px'>davon "+FMTH(sc.spentUnassignedHours)+" ohne zuordenbaren Mitarbeiter</td><td></td></tr>":"")
 +"<tr style='border-top:2px solid #ddd;font-weight:700'><td colspan='4' style='padding:6px'>Gesamt</td><td style='text-align:right'>"+FMT_EUR(sc.spentHoursCost)+"</td></tr></tfoot></table>"
 +"<div class='sec' style='font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700'>Reststunden je Mitarbeiter</div>"
 +"<table style='width:100%;border-collapse:collapse;font-size:12px'><thead><tr style='background:#f0ede8'><th style='padding:6px;text-align:left'>Mitarbeiter</th><th style='text-align:left'>Arbeitsgang</th><th>Std.</th><th>Satz</th><th style='text-align:right'>Kosten</th></tr></thead><tbody>"+maTable(sc.remHoursByMA,remByMAGroup)+"</tbody>"
