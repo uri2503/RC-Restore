@@ -51,7 +51,6 @@
   <div class="nlbl">Zeiterfassung</div>
   <div class="ni" data-v="zeit">&#9203; Stempeluhr</div>
   <div class="ni" data-v="zeitliste">&#128203; Alle Zeiten</div>
-  <div class="ni" data-v="zeitrep">&#128196; Zeit-Berichte</div>
   <div class="nlbl">System</div>
   <div class="ni" data-v="reports">&#128196; Berichte</div>
   <div class="ni" data-v="stamm">&#128218; Stammdaten</div>
@@ -835,7 +834,7 @@ var fn={"dashboard":vDash,"vehicles":vVeh,"projects":vProj,"groups":vGrp,
 "zeit":vZeit,"zeitliste":vZeitListe,"zeitrep":vZeitRep,
 "kennzahlen":vKZ,"reports":vRep,"settings":vSet,"fp":vFP,"scenario":vScenario}[APP.view];
 mc.innerHTML=fn?fn():"<div class=\"page\"><p>Nicht gefunden</p></div>";
-if(APP.view==="reports")setTimeout(renderRepAnalyse,80);
+if(APP.view==="kennzahlen"&&KZ_TAB==="aufwand")setTimeout(renderRepAnalyse,80);
 if(APP.view==="scenario")setTimeout(renderScenario,80);
 if(APP.view==="settings")setTimeout(checkStorageUsage,100);
 if(APP.view==="zeit")checkStampTimer();
@@ -1839,7 +1838,7 @@ if(inp.value.trim()===(D().settings.kpPin||"0000")){KZ_UNLOCKED=true;closeKZPin(
 else{if(err){err.textContent="\u274c Falscher PIN";setTimeout(function(){err.textContent="";},2000);}inp.value="";inp.focus();}
 }
 function closeKZPrint(){var el=document.getElementById("KZ-PRINT");if(el)el.remove();}
-function vKZ(){
+function vKZProjekt(){
 var d=D(),s=d.settings;
 var bkH=(+(s.miete||0))+(+(s.strom||0))+(+(s.agk||0))+(+(s.personal||0));
 var ssH=+(s.ss||90),ertH=ssH-bkH,cards="";
@@ -1884,9 +1883,7 @@ for(var j=0;j<_p.teile.length;j++)if(_p.teile[j].status==="s7")totInst++;
 }
 var totErtH=ssH-bkH;
 var dashColor=totErtH>=0?"#3d7a52":"#c41230";
-return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div><div class=\"pt\">&#128202; Projektkennzahlen</div><div class=\"ps\">vertraulich</div></div>"
-+"<button class=\"btn btn-g btn-sm\" onclick=\"KZ_UNLOCKED=false;nav('reports')\">&#128274; Sperren</button></div>"
-+"<div class=\"card mb3\" style=\"border-top:4px solid "+dashColor+"\"><div class=\"flex fac fjb mb3\">"
+return "<div class=\"card mb3\" style=\"border-top:4px solid "+dashColor+"\"><div class=\"flex fac fjb mb3\">"
 +"<div><div class=\"ff fw\" style=\"font-size:22px;color:"+dashColor+"\">"+FMT_EUR(totErtH)+"/h</div>"
 +"<div class=\"tsm cm\">Deckungsbeitrag pro Arbeitsstunde</div></div>"
 +"<div style=\"text-align:right\"><div class=\"ff fw\" style=\"font-size:13px\">"+FMT_EUR(ssH)+"/h Stundensatz</div>"
@@ -1909,7 +1906,38 @@ return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div><div class=\"pt
 +"<div style=\"text-align:center;padding:10px;background:#fde8ec;border-radius:6px\"><div class=\"ff fw cr\" style=\"font-size:16px\">"+FMT_EUR(tBK)+"</div><div class=\"txs cm\">Betriebskosten</div></div>"
 +"<div style=\"text-align:center;padding:10px;background:"+(tEZ-tBK>=0?"#e6f7ee":"#fde8ec")+";border-radius:6px\"><div class=\"ff fw\" style=\"color:"+(tEZ-tBK>=0?"#3d7a52":"#c41230")+";font-size:16px\">"+FMT_EUR(tEZ-tBK)+"</div><div class=\"txs cm\">Zeitertrag</div></div></div>"
 +"<div style=\"padding:8px;background:#f0ede8;border-radius:5px;font-size:11px\">Stundensatz: "+FMT_EUR(ssH)+"/h | BK: "+FMT_EUR(bkH)+"/h | Ertrag/h: <strong>"+FMT_EUR(ertH)+"</strong></div></div>"
-+cards+"</div>";
++cards;
+}
+function vKZAufwand(){
+var d=D();
+var projOpts='<option value="">-- Alle Projekte --</option>';
+for(var i=0;i<d.projects.length;i++){var p=d.projects[i],v=getV(p.vid);projOpts+='<option value="'+p.id+'">'+p.name+(v?' ('+v.modell+')':"")+'</option>';}
+return "<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128202; Aufwandsanalyse</div>"
++"<div class=\"frow mb3\"><div class=\"fg\"><label class=\"fl\">Projekt</label>"
++"<select class=\"fsel\" id=\"rep-proj\" onchange=\"renderRepAnalyse()\">"+projOpts+"</select></div>"
++"<div class=\"fg\"><label class=\"fl\">Auswertung</label><select class=\"fsel\" id=\"rep-type\" onchange=\"renderRepAnalyse()\">"
++"<option value=\"arbeitsgang\">Nach Arbeitsgang</option><option value=\"mitarbeiter\">Nach Mitarbeiter</option>"
++"<option value=\"monat\">Nach Monat</option><option value=\"projekt\">Projektvergleich</option>"
++"</select></div></div>"
++"<div id=\"rep-result\"></div></div>";
+}
+function vKZZeit(){
+return rBericht();
+}
+var KZ_TAB="projekt";
+function setKZTab(t){
+KZ_TAB=t;
+var mc=E("MC");if(mc)mc.innerHTML=vKZ();
+if(t==="aufwand")setTimeout(renderRepAnalyse,80);
+}
+function vKZ(){
+var tabs=[["projekt","&#128202; Projektkennzahlen"],["aufwand","&#128200; Aufwandsanalyse"],["zeit","&#128337; Zeitauswertung"]];
+var tabHTML=tabs.map(function(t){return '<button class="brep-tab'+(KZ_TAB===t[0]?' on':'')+'" onclick="setKZTab(\''+t[0]+'\')">'+t[1]+'</button>';}).join('');
+var body=KZ_TAB==="aufwand"?vKZAufwand():KZ_TAB==="zeit"?vKZZeit():vKZProjekt();
+return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div><div class=\"pt\">&#128202; Kennzahlen</div><div class=\"ps\">intern &mdash; Auswertungen &amp; Steuerung, vertraulich</div></div>"
++"<button class=\"btn btn-g btn-sm\" onclick=\"KZ_UNLOCKED=false;KZ_TAB='projekt';nav('dashboard')\">&#128274; Sperren</button></div>"
++"<div class=\"brep-tabs\">"+tabHTML+"</div>"
++body+"</div>";
 }
 function printKZ(pid){
 var d=D(),s=d.settings,p=getP(pid),v=getV(p.vid),c=costs(p);
@@ -1941,25 +1969,26 @@ document.body.appendChild(div);
 }
 function vRep(){
 var d=D();
-var projOpts='<option value="">-- Alle Projekte --</option>';
-for(var i=0;i<d.projects.length;i++){var p=d.projects[i],v=getV(p.vid);projOpts+='<option value="'+p.id+'">'+p.name+(v?' ('+v.modell+')':"")+'</option>';}
 return "<div class=\"page\"><div class=\"pt mb3\">&#128196; Berichte</div>"
-+"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128196; Schnellberichte (PDF)</div>"
-+"<div style=\"display:flex;flex-direction:column;gap:6px\">"
++"<div class=\"ps\">Kundenunterlagen &mdash; alles, was wir für die KD benötigen</div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128196; Projektberichte (PDF)</div>"
++(d.projects.length?"<div style=\"display:flex;flex-direction:column;gap:6px\">"
 +d.projects.map(function(p){var v=getV(p.vid);
 return "<div class=\"flex fac fjb\" style=\"padding:8px 12px;background:var(--bg);border-radius:6px\">"
 +"<div><div class=\"tsm fw\">"+p.name+"</div>"+(v?"<div class=\"txs cm\">"+v.marke+" "+v.modell+"</div>":"")+"</div>"
 +"<button class=\"btn btn-p btn-sm\" data-action=\"printRep\" data-id=\""+p.id+"\">&#128196; PDF</button></div>";
 }).join("")
-+"</div></div>"
-+"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128202; Aufwandsanalyse</div>"
-+"<div class=\"frow mb3\"><div class=\"fg\"><label class=\"fl\">Projekt</label>"
-+"<select class=\"fsel\" id=\"rep-proj\" onchange=\"renderRepAnalyse()\">"+projOpts+"</select></div>"
-+"<div class=\"fg\"><label class=\"fl\">Auswertung</label><select class=\"fsel\" id=\"rep-type\" onchange=\"renderRepAnalyse()\">"
-+"<option value=\"arbeitsgang\">Nach Arbeitsgang</option><option value=\"mitarbeiter\">Nach Mitarbeiter</option>"
-+"<option value=\"monat\">Nach Monat</option><option value=\"projekt\">Projektvergleich</option>"
-+"</select></div></div>"
-+"<div id=\"rep-result\"></div></div></div>";
++"</div>":"<p class=\"txs cm\">Noch keine Projekte.</p>")
++"</div>"
++"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128203; Fahrzeugbefunde</div>"
++(d.projects.length?"<div style=\"display:flex;flex-direction:column;gap:6px\">"
++d.projects.map(function(p){var v=getV(p.vid);
+return "<div class=\"flex fac fjb\" style=\"padding:8px 12px;background:var(--bg);border-radius:6px\">"
++"<div><div class=\"tsm fw\">"+p.name+"</div>"+(v?"<div class=\"txs cm\">"+v.marke+" "+v.modell+"</div>":"")+"</div>"
++"<button class=\"btn btn-p btn-sm\" data-action=\"printBefund\" data-id=\""+p.id+"\">&#128203; Befund</button></div>";
+}).join("")
++"</div>":"<p class=\"txs cm\">Noch keine Projekte.</p>")
++"</div></div>";
 }
 function renderRepAnalyse(){
 var projId=GV("rep-proj"),type=GV("rep-type"),el=E("rep-result");if(!el)return;
@@ -2659,6 +2688,7 @@ else if(a==="savePW")savePW();else if(a==="saveSS")saveSS();
 else if(a==="exportData")exportData();
 else if(a==="printKZ")printKZ(id);
 else if(a==="printRep")printRep(id);
+else if(a==="printBefund")printBefund(id);
 else if(a==="importSMP")importSMP();
 else if(a==="delSMPEntry"){
 if(!confirm("Zeiteintrag l\u00f6schen?"))return;
@@ -3006,7 +3036,7 @@ window.dkwSel=function(sel){var parts=sel.value.split('_');DW=parseInt(parts[0])
 window.toggleDash=function(id){DASH_OPEN[id]=(DASH_OPEN[id]===false)?true:false;nav('dashboard');};
 window.addKP=addKP;window.delKP=delKP;window.addAG=addAG;window.delAG=delAG;window.addMA=addMA;window.delMA=delMA;
 window.delSMP=function(i){smpDB().id.splice(i,1);saveDB();nav('id');};
-window.renderBericht=function(){nav('zeitrep');};
+window.renderBericht=function(){var mc=E('MC');if(mc)mc.innerHTML=vKZ();};
 function rAuf(){
 var auf=smpDB().auf||[];
 var rows='';
