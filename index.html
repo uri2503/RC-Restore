@@ -465,11 +465,13 @@ return"";
 // name-based getSMPTime() for legacy entries recorded before the pid field existed.
 function getSMPTimeForProject(p){
 if(!p)return[];
+var out=[];
 if(p.id){
-  var byId=APP.smp.zeit.filter(function(e){return e.pid===p.id;});
-  if(byId.length)return byId;
+  APP.smp.zeit.forEach(function(e){if(e.pid===p.id)out.push(e);});
 }
-return getSMPTime(p.smpProj||p.name);
+var byName=getSMPTime(p.smpProj||p.name);
+byName.forEach(function(e){if(out.indexOf(e)<0)out.push(e);});
+return out;
 }
 function getSMPTimeH(smpProj){
 var entries=getSMPTime(smpProj),h=0;
@@ -1355,7 +1357,7 @@ rows+="<tr><td class=\"txs\">"+e.date+"</td>"
 +"<td class=\"txs cm\">"+detail+"</td>"
 +(ma?"<td><span class=\"b-purple\" style=\"display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:600;background:#f3e6fc;color:var(--purple);border:1px solid rgba(124,58,237,.2)\">"+ma[1]+"</span></td>":"<td></td>")
 +"<td class=\"txs cg\">"+(e.pay>0?FMT_EUR(e.pay):"")+"</td>"
-+"<td><button class=\"bic\" data-action=\"delSMPEntry\" data-id=\""+e.id+"\">&#128465;</button></td></tr>";
++"<td><div class=\"flex g2p\"><button class=\"bic\" data-action=\"openZM\" data-id=\""+e.id+"\">&#9998;</button><button class=\"bic\" data-action=\"delSMPEntry\" data-id=\""+e.id+"\">&#128465;</button></div></td></tr>";
 }
 return pH("z")
 +"<div class=\"g2\" style=\"margin-bottom:16px\">"
@@ -1526,6 +1528,7 @@ rows+="<div class=\"zt-row\">"
 +(ma?"<span class=\"zt-ma\">"+ma[1]+"</span>":"")
 +"<span class=\"zt-note\">"+note+"</span>"
 +(e.pay>0?"<span class=\"zt-pay\">"+FMT_EUR(e.pay)+"</span>":"")
++"<button class=\"bic\" data-action=\"openZM\" data-id=\""+e.id+"\">&#9998;</button>"
 +"<button class=\"bic\" data-action=\"delSMPEntry\" data-id=\""+e.id+"\">&#128465;</button>"
 +"</div>";
 }
@@ -2689,6 +2692,8 @@ else if(a==="exportData")exportData();
 else if(a==="printKZ")printKZ(id);
 else if(a==="printRep")printRep(id);
 else if(a==="printBefund")printBefund(id);
+else if(a==="openZM")openZM(id);
+else if(a==="saveZM")saveZM(id);
 else if(a==="importSMP")importSMP();
 else if(a==="delSMPEntry"){
 if(!confirm("Zeiteintrag l\u00f6schen?"))return;
@@ -4458,6 +4463,52 @@ if(dur<0) dur=0;
 var pay=calcPay(dur,rate);
 DB.zeit.push({id:uid(),date:d,start:startDt.toISOString(),end:endDt.toISOString(),dur:dur,rate:rate,pay:pay,proj:proj,note:note,pause:pause,pid:matchProjectId(proj),ma:zma,itemId:aufgabe});
 saveDB();nav('zeitliste');
+}
+function openZM(id){
+var e=APP.smp.zeit.filter(function(x){return x.id===id;})[0];
+if(!e)return;
+var maM=(e.note||'').match(/\[([^\]]+)\]$/);
+var maName=maM?maM[1].trim():'';
+var noteBody=(e.note||'').replace(/\[[^\]]+\]$/,'').trim();
+var task=noteBody.split(' – ')[0]||'';
+var detail=noteBody.split(' – ').slice(1).join(' – ');
+var sT=e.start?new Date(e.start):null,eT=e.end?new Date(e.end):null;
+var vonV=sT&&!isNaN(sT)?sT.toISOString().slice(11,16):'';
+var bisV=eT&&!isNaN(eT)?eT.toISOString().slice(11,16):'';
+openM(MH('Zeiteintrag bearbeiten')
++'<div class="mb2">'
++'<div class="frow"><div class="fg"><label class="fl">Datum</label><input class="fi" type="date" id="zme-date" value="'+esc(e.date||'')+'"></div>'
++'<div class="fg"><label class="fl">Pause (min)</label><input class="fi" type="number" id="zme-pause" min="0" value="'+(e.pause||0)+'"></div></div>'
++'<div class="frow"><div class="fg"><label class="fl">Von</label><input class="fi" type="time" id="zme-von" value="'+vonV+'"></div>'
++'<div class="fg"><label class="fl">Bis</label><input class="fi" type="time" id="zme-bis" value="'+bisV+'"></div></div>'
++'<div class="fg"><label class="fl">Projekt</label><select class="fsel" id="zme-proj">'+buildProjOpts(e.proj)+'</select></div>'
++'<div class="fg"><label class="fl">Arbeitsgang</label><select class="fsel" id="zme-task">'+buildTaskOpts(task)+'</select></div>'
++'<div class="fg"><label class="fl">Notiz / Detail</label><input class="fi" id="zme-note" value="'+esc(detail)+'"></div>'
++'<div class="frow"><div class="fg"><label class="fl">Stundensatz &euro;/h</label><input class="fi" type="number" id="zme-rate" step="1" value="'+(e.rate||0)+'"></div>'
++'<div class="fg"><label class="fl">Mitarbeiter</label><select class="fsel" id="zme-ma">'+buildMAOpts(maName)+'</select></div></div>'
++'</div>'
++MF('saveZM',id));
+}
+function saveZM(id){
+var e=APP.smp.zeit.filter(function(x){return x.id===id;})[0];
+if(!e)return;
+var d=GV('zme-date'),von=GV('zme-von'),bis=GV('zme-bis');
+if(!d||!von||!bis){toast('Bitte Datum, Von und Bis ausfüllen.','err');return;}
+var startDt=new Date(d+'T'+von),endDt=new Date(d+'T'+bis);
+if(endDt<=startDt){toast('"Bis" muss nach "Von" liegen.','err');return;}
+var pause=GI('zme-pause');
+var dur=(endDt-startDt)-(pause*60000);
+if(dur<0)dur=0;
+var rate=GF('zme-rate');
+var proj=GV('zme-proj');
+var ztask=GV('zme-task');
+var noteRaw=GV('zme-note');
+var zma=GV('zme-ma');
+var note=ztask?(noteRaw?ztask+' – '+noteRaw:ztask):noteRaw;
+if(zma) note=(note?note+' ['+zma+']':'['+zma+']');
+e.date=d;e.start=startDt.toISOString();e.end=endDt.toISOString();e.dur=dur;e.pause=pause;
+e.rate=rate;e.pay=calcPay(dur,rate);e.proj=proj;e.note=note;e.pid=matchProjectId(proj);e.ma=zma;
+saveDB();closeM();render();toast('Gespeichert ✓','ok');
 }
 function syncTaskNote(selId, noteId){
 var sel=document.getElementById(selId);
