@@ -465,11 +465,13 @@ return"";
 // name-based getSMPTime() for legacy entries recorded before the pid field existed.
 function getSMPTimeForProject(p){
 if(!p)return[];
+var out=[];
 if(p.id){
-  var byId=APP.smp.zeit.filter(function(e){return e.pid===p.id;});
-  if(byId.length)return byId;
+  APP.smp.zeit.forEach(function(e){if(e.pid===p.id)out.push(e);});
 }
-return getSMPTime(p.smpProj||p.name);
+var byName=getSMPTime(p.smpProj||p.name);
+byName.forEach(function(e){if(out.indexOf(e)<0)out.push(e);});
+return out;
 }
 function getSMPTimeH(smpProj){
 var entries=getSMPTime(smpProj),h=0;
