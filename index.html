@@ -2595,6 +2595,21 @@ var a=document.createElement("a");a.href=u;a.download="riedel-backup-"+MANDANT+"
 document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
 toast("Vollbackup "+Math.round(json.length/1024)+"KB \u2713","ok");
 }
+// Lädt automatisch eine Sicherheitskopie des AKTUELLEN Stands herunter, bevor ein Restore/Import
+// die Daten überschreibt — verhindert, dass ein versehentlich falsches Backup unwiederbringlich ist.
+function autoSafetyBackup(){
+try{
+var bk={version:"3.1",mandant:MANDANT,exported:new Date().toISOString(),
+cr:{vehicles:APP.data.vehicles,projects:APP.data.projects,gruppenVorlagen:APP.data.gruppenVorlagen,
+settings:APP.data.settings,arbeitsgaenge:APP.data.arbeitsgaenge,mitarbeiter:APP.data.mitarbeiter},
+smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[]}};
+var json=JSON.stringify(bk,null,2);
+var b=new Blob([json],{type:"application/json"});var u=URL.createObjectURL(b);
+var stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+var a=document.createElement("a");a.href=u;a.download="riedel-SICHERHEITSKOPIE-vor-restore-"+MANDANT+"-"+stamp+".json";
+document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
+}catch(e){}
+}
 function exportSMP(){
 var smpFull=Object.assign({},APP.smp,{kw:[],proj:[],auf:[],id:[]});
 var json=JSON.stringify({version:"1.0",exported:new Date().toISOString(),appName:"SimpleMind Planner",data:smpFull},null,2);
@@ -2613,6 +2628,7 @@ if(!obj.exported&&obj.exportDate) obj.exported=obj.exportDate;
 
 var info="Backup vom "+(obj.exported||"").slice(0,10)+"\nProjekte: "+(obj.cr.projects?obj.cr.projects.length:0)+"\nZeiteintr\u00e4ge: "+(obj.smp.zeit?obj.smp.zeit.length:0)+"\n\nAlle Daten \u00fcberschreiben?";
 if(!confirm(info))return;
+autoSafetyBackup();
 var d=obj.cr;
 APP.data.vehicles=d.vehicles||[];APP.data.projects=d.projects||[];
 APP.data.gruppenVorlagen=d.gruppenVorlagen||APP.data.gruppenVorlagen;
@@ -2628,6 +2644,7 @@ APP.pid=null;saveData();render();toast("Vollbackup wiederhergestellt \u2713","ok
 var data=obj.data||obj;
 if(data&&data.vehicles&&data.projects){
 if(!confirm("CR Daten \u00fcberschreiben?"))return;
+autoSafetyBackup();
 APP.data.vehicles=data.vehicles||[];APP.data.projects=data.projects||[];
 APP.data.gruppenVorlagen=data.gruppenVorlagen||APP.data.gruppenVorlagen;
 APP.data.settings=data.settings||APP.data.settings;
@@ -2864,6 +2881,7 @@ try{
   if(rmData.projects) info+=', '+rmData.projects.length+' Proj';
   if(smpData.zeit) info+=', '+(smpData.zeit.length||0)+' Zeiten';
   if(!confirm('Backup importieren? '+info)) return;
+  autoSafetyBackup();
   if(!rmData.vehicles) rmData.vehicles=[];
   if(!rmData.projects) rmData.projects=[];
   if(!rmData.settings) rmData.settings=APP.data.settings;
