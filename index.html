@@ -2110,7 +2110,7 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"fg\"><label class=\"fl\">€/h</label><input class=\"fi\" type=\"number\" id=\"ag-rate\" value=\"90\"></div></div>"
 +"<button class=\"btn btn-p btn-sm\" onclick=\"addAG()\">+ Arbeitsgang</button></div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128101; Mitarbeiter (Fertigungsplanung)</div>"
-+"<div class=\"txs cm mb2\">Diese Liste wird für die Baugruppen-/Aufgaben-Zuordnung in Fertigungsplanung &amp; Szenariorechner genutzt (separat vom „Mitarbeiterstamm“ unter Stammdaten).</div>"
++"<div class=\"txs cm mb2\">Diese Liste wird für die Baugruppen-/Aufgaben-Zuordnung in Fertigungsplanung &amp; Szenariorechner genutzt &mdash; identisch mit dem „Mitarbeiterstamm“ unter Stammdaten, hier zusätzlich mit Wochenkapazität.</div>"
 +(maRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+maRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Mitarbeiter.</p>")
 +(macrEdit?"<div class=\"txs\" style=\"color:var(--red);margin-bottom:8px\">Bearbeite: "+esc(macrEdit.name)+"</div>":"")
 +"<div class=\"frow\" style=\"grid-template-columns:1fr 1fr\"><div class=\"fg\"><label class=\"fl\">Name</label><input class=\"fi\" id=\"ma-name\" value=\""+(macrEdit?esc(macrEdit.name):"")+"\"></div>"
@@ -2639,6 +2639,7 @@ APP.smp.zeit=obj.smp.zeit||[];APP.smp.kundenprojekte=obj.smp.kundenprojekte||[];
 APP.smp.arbeitsgaenge=obj.smp.arbeitsgaenge||[];APP.smp.mitarbeiter=obj.smp.mitarbeiter||[];
 for(var i=0;i<APP.data.vehicles.length;i++){var v=APP.data.vehicles[i];if(!v.bild)v.bild=[];if(!v.untB)v.untB=[];if(!v.untA)v.untA=[];if(!v.dok)v.dok=[];if(!v.smpProj)v.smpProj="";}
 for(var i=0;i<APP.data.projects.length;i++){var p2=APP.data.projects[i];if(!p2.smpProj)p2.smpProj="";if(!p2.teile)p2.teile=[];if(!p2.tagebuch)p2.tagebuch=[];if(!p2.demontage)p2.demontage=[];if(!p2.gruppen)p2.gruppen=[];}
+migrateMitarbeiter();
 APP.pid=null;saveData();render();toast("Vollbackup wiederhergestellt \u2713","ok");return;
 }
 var data=obj.data||obj;
@@ -2800,9 +2801,40 @@ get id(){return smpDB().id;}, set id(v){smpDB().id=v;},
 get zeit(){return smpDB().zeit;}, set zeit(v){smpDB().zeit=v;},
 get kundenprojekte(){return smpDB().kundenprojekte;}, set kundenprojekte(v){smpDB().kundenprojekte=v;},
 get arbeitsgaenge(){return smpDB().arbeitsgaenge;}, set arbeitsgaenge(v){smpDB().arbeitsgaenge=v;},
-get mitarbeiter(){return smpDB().mitarbeiter;}, set mitarbeiter(v){smpDB().mitarbeiter=v;},
+// Mitarbeiter zeigt bewusst auf APP.data.mitarbeiter (nicht smpDB()) — Stammdaten und
+// Einstellungen/Fertigungsplanung nutzten früher zwei getrennte, nicht synchronisierte Listen;
+// seit der Vereinheitlichung ist APP.data.mitarbeiter die einzige Quelle (siehe migrateMitarbeiter()).
+get mitarbeiter(){if(!APP.data.mitarbeiter)APP.data.mitarbeiter=[];return APP.data.mitarbeiter;}, set mitarbeiter(v){APP.data.mitarbeiter=v;},
 get proj(){return APP.data.projects;}
 };
+// Führt Mitarbeiter aus der alten, getrennten APP.smp.mitarbeiter-Liste (Stammdaten) in die
+// kanonische APP.data.mitarbeiter-Liste (Einstellungen/Fertigungsplanung) zusammen — per Name
+// dedupliziert, ohne bereits vorhandene Felder zu überschreiben. Danach ist APP.smp.mitarbeiter
+// leer und wird nicht mehr benutzt (DB.mitarbeiter zeigt direkt auf APP.data.mitarbeiter).
+function migrateMitarbeiter(){
+if(!APP.data.mitarbeiter)APP.data.mitarbeiter=[];
+if(!APP.smp.mitarbeiter||!APP.smp.mitarbeiter.length)return;
+var byName={};
+APP.data.mitarbeiter.forEach(function(m){var k=(m.name||'').trim().toLowerCase();if(k)byName[k]=m;});
+var changed=false;
+APP.smp.mitarbeiter.forEach(function(sm){
+var key=(sm.name||'').trim().toLowerCase();
+if(!key)return;
+var existing=byName[key];
+if(existing){
+if(!existing.rolle&&sm.rolle)existing.rolle=sm.rolle;
+if(!existing.tel&&sm.tel)existing.tel=sm.tel;
+if(!existing.rate&&sm.rate)existing.rate=sm.rate;
+}else{
+var merged={id:uid(),name:sm.name,rolle:sm.rolle||'',rate:sm.rate||0,tel:sm.tel||'',wochenkapazitaet:0};
+APP.data.mitarbeiter.push(merged);
+byName[key]=merged;
+}
+changed=true;
+});
+APP.smp.mitarbeiter=[];
+if(changed)saveData();
+}
 function saveDB(){
 clearTimeout(_SAVE_T_SMP);
 _SAVE_T_SMP=setTimeout(function(){saveData();},600);
@@ -2910,6 +2942,7 @@ try{
   if(smpData.ag) APP.smp.ag=smpData.ag;
   if(smpData.rcdev) APP.smp.rcdev=smpData.rcdev;
   if(smpData.docs) APP.smp.docs=smpData.docs;
+  migrateMitarbeiter();
   saveData();
   toast((rmData.vehicles.length||0)+' Fzg, '+(rmData.projects.length||0)+' Proj importiert','ok');
   setTimeout(function(){nav('dashboard');},800);
@@ -2944,7 +2977,7 @@ for(var i=0;i<s.zeit.length;i++){totalDur+=s.zeit[i].dur||0;totalPay+=parseFloat
 var lsSizeKB=0;
 try{var cr=localStorage.getItem(CR_KEY)||'';var sm=localStorage.getItem(SMP_KEY)||'';lsSizeKB=Math.round((cr.length+sm.length)/1024);}catch(e){}
 return{zeit:s.zeit.length,kw:(s.kw||[]).length,auf:(s.auf||[]).length,id:(s.id||[]).length,
-ma:(s.mitarbeiter||[]).length,kp:(s.kundenprojekte||[]).length,ag:(s.arbeitsgaenge||[]).length,
+ma:(APP.data.mitarbeiter||[]).length,kp:(s.kundenprojekte||[]).length,ag:(s.arbeitsgaenge||[]).length,
 proj:APP.data.projects.length,vehicles:APP.data.vehicles.length,
 totalDur:totalDur,totalPay:totalPay,lsSizeKB:lsSizeKB};
 }
@@ -4719,7 +4752,7 @@ function afterLogin(){
 var el=E("LOGIN");if(el)el.style.display="none";
 sbEnsureRow(function(ok){
 if(!ok){toast("Verbindung zur Datenbank fehlgeschlagen.","err");return;}
-loadDataAsync(function(){ nav("dashboard"); });
+loadDataAsync(function(){ migrateMitarbeiter(); nav("dashboard"); });
 });
 }
 function doLogin(){
@@ -4763,7 +4796,7 @@ var _bootTimeout=setTimeout(function(){
 
 function bootWithSession(retried){
   sbEnsureRow(function(ok){
-    if(ok){ clearTimeout(_bootTimeout); loadDataAsync(function(){ nav("dashboard"); }); }
+    if(ok){ clearTimeout(_bootTimeout); loadDataAsync(function(){ migrateMitarbeiter(); nav("dashboard"); }); }
     else if(!retried){
       // Transient network hiccup vs. a truly expired session look the same here — retry
       // once before dropping to the login screen, so a brief blip doesn't force a re-login.
