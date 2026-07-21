@@ -841,7 +841,7 @@ var fn={"dashboard":vDash,"vehicles":vVeh,"projects":vProj,"groups":vGrp,
 "kennzahlen":vKZ,"reports":vRep,"settings":vSet,"fp":vFP,"scenario":vScenario}[APP.view];
 mc.innerHTML=fn?fn():"<div class=\"page\"><p>Nicht gefunden</p></div>";
 if(APP.view==="kennzahlen"&&KZ_TAB==="aufwand")setTimeout(renderRepAnalyse,80);
-if(APP.view==="scenario")setTimeout(renderScenario,80);
+if(APP.view==="scenario"&&SC_TAB==="einzel")setTimeout(renderScenario,80);
 if(APP.view==="settings")setTimeout(checkStorageUsage,100);
 if(APP.view==="zeit")checkStampTimer();
 }catch(ex){
@@ -1076,18 +1076,109 @@ return "<div class=\"page\"><div class=\"pt mb3\">&#127981; Fertigungsplanung</d
 +"</div>"
 +"<div class=\"g2\">"+(cards||"<p class=\"cm txs\">Keine aktiven Projekte.</p>")+"</div></div>";
 }
+var SC_TAB="einzel";
+var SC_FILTER="alle";
+function setSCTab(t){SC_TAB=t;var mc=E("MC");if(mc)mc.innerHTML=vScenario();if(SC_TAB==="einzel")setTimeout(renderScenario,80);}
+function setSCFilter(f){SC_FILTER=f;var el=E("sc-alle-result");if(el)el.innerHTML=scenarioAlleTable();}
 function vScenario(){
 var d=D();
 if(!d.projects.length)return "<div class=\"page\"><div class=\"pt mb3\">&#128202; Szenariorechner</div><div class=\"empty\"><p>Noch keine Projekte angelegt.</p></div></div>";
+var tabHTML="<div class=\"brep-tabs\">"
++"<button class=\"brep-tab"+(SC_TAB==="einzel"?" on":"")+"\" onclick=\"setSCTab('einzel')\">Einzelprojekt</button>"
++"<button class=\"brep-tab"+(SC_TAB==="alle"?" on":"")+"\" onclick=\"setSCTab('alle')\">Alle Projekte (Bericht)</button>"
++"</div>";
+if(SC_TAB==="alle"){
+return "<div class=\"page\"><div class=\"flex fac fjb mb3\"><div class=\"pt\">&#128202; Szenariorechner</div>"
++"<button class=\"btn btn-g btn-sm\" onclick=\"KZ_UNLOCKED=false;nav('projects')\">&#128274; Sperren</button></div>"
++tabHTML
++vScenarioAlle()
++"</div>";
+}
 var internFirst=d.projects.filter(function(p){return p.art==="intern";})[0];
 var defId=(internFirst||d.projects[0]).id;
 var opts=d.projects.map(function(p){return "<option value=\""+p.id+"\""+(p.id===defId?" selected":"")+">"+esc(p.name)+(p.art==="intern"?" (intern)":"")+"</option>";}).join("");
 return "<div class=\"page\"><div class=\"pt mb3\">&#128202; Szenariorechner</div>"
++tabHTML
 +"<div class=\"card mb3\"><div class=\"fg\"><label class=\"fl\">Projekt</label><select class=\"fsel\" id=\"sc-proj\" onchange=\"renderScenario()\">"+opts+"</select></div></div>"
 +"<div id=\"sc-result\"></div>"
 +"<div class=\"flex g2p mt3\"><button class=\"btn btn-p btn-sm\" onclick=\"printScenario(GV('sc-proj'))\">&#128196; PDF / Drucken</button>"
 +"<button class=\"btn btn-g btn-sm\" onclick=\"KZ_UNLOCKED=false;nav('projects')\">&#128274; Sperren</button></div>"
 +"</div>";
+}
+// Filterbare Projektübersicht (extern/intern/alle) auf Basis derselben scenarioCalc()-Marge wie die
+// Einzelprojekt-Ansicht — kunde nutzt Kostenvorschlag, intern nutzt Ziel-Verkaufspreis als Zielwert.
+function scenarioAlleProjects(){
+var d=D();
+return d.projects.filter(function(p){
+if(SC_FILTER==="kunde")return p.art!=="intern";
+if(SC_FILTER==="intern")return p.art==="intern";
+return true;
+});
+}
+function vScenarioAlle(){
+var filterHTML="<div class=\"brep-filter mb3\">"
++"<select class=\"fsel\" style=\"max-width:240px\" onchange=\"setSCFilter(this.value)\">"
++"<option value=\"alle\""+(SC_FILTER==="alle"?" selected":"")+">Alle Projekte</option>"
++"<option value=\"kunde\""+(SC_FILTER==="kunde"?" selected":"")+">Nur Kundenprojekte (extern)</option>"
++"<option value=\"intern\""+(SC_FILTER==="intern"?" selected":"")+">Nur interne Projekte</option>"
++"</select>"
++"<button class=\"pdf-btn\" style=\"margin-left:auto\" onclick=\"printScenarioAlle()\">&#128424; PDF / Drucken</button>"
++"</div>";
+return filterHTML+"<div id=\"sc-alle-result\">"+scenarioAlleTable()+"</div>";
+}
+function scenarioAlleTable(){
+var projects=scenarioAlleProjects();
+if(!projects.length)return "<div class=\"card\"><p class=\"txs cm\" style=\"text-align:center;padding:20px\">Keine Projekte für diese Auswahl.</p></div>";
+var totalCost=0,totalZiel=0,totalMargin=0,wirtCount=0;
+var rows=projects.map(function(p){
+var sc=scenarioCalc(p),v=getV(p.vid);
+var ziel=p.art==="intern"?sc.zielVK:sc.kostenvorschlag;
+totalCost+=sc.totalCostToComplete;totalZiel+=ziel;totalMargin+=sc.margin;
+if(sc.verdict==="wirtschaftlich")wirtCount++;
+var artLbl=p.art==="intern"?"Intern":"Kunde";
+var zielLbl=p.art==="intern"?"Ziel-VK":"Kostenvorschlag";
+return "<tr><td style=\"font-weight:600\">"+esc(p.name)+(v?"<div class=\"txs cm\">"+esc(v.marke+" "+v.modell)+"</div>":"")+"</td>"
++"<td>"+badge(p.art==="intern"?"b-blue":"b-teal",artLbl)+"</td>"
++"<td style=\"color:var(--red)\">"+FMT(sc.totalCostToComplete)+"</td>"
++"<td>"+FMT(ziel)+"<div class=\"txs cm\">"+zielLbl+"</div></td>"
++"<td style=\"font-weight:700\" class=\""+(sc.margin>=0?"cg":"cr")+"\">"+FMT(sc.margin)+"</td>"
++"<td>"+badge(sc.verdict==="wirtschaftlich"?"b-green":"b-red",sc.verdict==="wirtschaftlich"?"✓ Wirtschaftlich":"✕ Unwirtschaftlich")+"</td></tr>";
+}).join("");
+return "<div class=\"twrap\"><table><thead><tr><th>Projekt</th><th>Art</th><th>Kosten bis fertig</th><th>Zielwert</th><th>Marge</th><th>Status</th></tr></thead>"
++"<tbody>"+rows+"</tbody>"
++"<tfoot><tr style=\"background:var(--bg);font-weight:700\"><td colspan=\"2\">Gesamt ("+projects.length+" Projekte, "+wirtCount+" wirtschaftlich)</td>"
++"<td class=\"cr\">"+FMT(totalCost)+"</td><td>"+FMT(totalZiel)+"</td><td class=\""+(totalMargin>=0?"cg":"cr")+"\">"+FMT(totalMargin)+"</td><td></td></tr></tfoot></table></div>";
+}
+function printScenarioAlle(){
+var projects=scenarioAlleProjects();
+var totalCost=0,totalZiel=0,totalMargin=0;
+var rows=projects.map(function(p){
+var sc=scenarioCalc(p),v=getV(p.vid);
+var ziel=p.art==="intern"?sc.zielVK:sc.kostenvorschlag;
+totalCost+=sc.totalCostToComplete;totalZiel+=ziel;totalMargin+=sc.margin;
+var artLbl=p.art==="intern"?"Intern":"Kunde";
+var zielLbl=p.art==="intern"?"Ziel-VK":"Kostenvorschlag";
+return "<tr><td style='padding:6px'>"+esc(p.name)+(v?" <span style='color:#888;font-size:10px'>("+esc(v.marke+" "+v.modell)+")</span>":"")+"</td>"
++"<td>"+artLbl+"</td>"
++"<td style='text-align:right;color:#c41230'>"+FMT_EUR(sc.totalCostToComplete)+"</td>"
++"<td style='text-align:right'>"+FMT_EUR(ziel)+" <span style='color:#888;font-size:9px'>("+zielLbl+")</span></td>"
++"<td style='text-align:right;font-weight:700;color:"+(sc.margin>=0?"#3d7a52":"#c41230")+"'>"+FMT_EUR(sc.margin)+"</td>"
++"<td style='text-align:right'>"+(sc.verdict==="wirtschaftlich"?"✓":"✕")+"</td></tr>";
+}).join("")||"<tr><td colspan='6' style='padding:6px;color:#888'>Keine Projekte für diese Auswahl.</td></tr>";
+var filterLbl={alle:"Alle Projekte",kunde:"Nur Kundenprojekte",intern:"Nur interne Projekte"}[SC_FILTER];
+var body="<div style='background:#1a1715;color:#fff;padding:8px;border-radius:5px;margin-bottom:12px;font-size:10px'>VERTRAULICH &bull; CHEFSACHE</div>"
++"<h1 style='color:#c41230'>Projektauswertung &mdash; Szenariorechner</h1>"
++"<p style='color:#888;font-size:11px'>"+filterLbl+" &bull; "+projects.length+" Projekte &bull; "+new Date().toLocaleDateString("de-DE")+"</p>"
++"<table style='width:100%;border-collapse:collapse;font-size:12px;margin-top:12px'><thead><tr style='background:#f0ede8'><th style='padding:6px;text-align:left'>Projekt</th><th style='text-align:left'>Art</th><th style='text-align:right'>Kosten bis fertig</th><th style='text-align:right'>Zielwert</th><th style='text-align:right'>Marge</th><th style='text-align:right'>Status</th></tr></thead><tbody>"+rows+"</tbody>"
++"<tfoot><tr style='border-top:3px solid #c41230;font-weight:800;background:#fde8ec'><td colspan='2' style='padding:6px'>GESAMT</td><td style='text-align:right;color:#c41230'>"+FMT_EUR(totalCost)+"</td><td style='text-align:right'>"+FMT_EUR(totalZiel)+"</td><td style='text-align:right;color:"+(totalMargin>=0?"#3d7a52":"#c41230")+"'>"+FMT_EUR(totalMargin)+"</td><td></td></tr></tfoot></table>"
++"<p style='font-size:9px;color:#bbb;margin-top:12px'>Riedel classics &bull; "+new Date().toLocaleDateString("de-DE")+" &bull; VERTRAULICH</p>";
+var div=document.createElement("div");div.id="SC-PRINT";div.style.cssText="position:fixed;inset:0;background:#fff;z-index:2000;overflow-y:auto";
+div.innerHTML="<div style='position:sticky;top:0;background:#1a1715;padding:10px 20px;display:flex;gap:10px'>"
++"<span style='color:#fff;font-weight:700;flex:1'>Projektauswertung</span>"
++"<button onclick='window.print()' style='background:#c41230;color:#fff;border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-weight:700'>Drucken</button>"
++"<button onclick='closeScenarioPrint()' style='background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:5px;padding:7px 14px;cursor:pointer'>← Zurück</button>"
++"</div><div style='max-width:900px;margin:0 auto;padding:20px;font-family:Arial,sans-serif'>"+body+"</div>";
+document.body.appendChild(div);
 }
 function renderScenario(){
 var pid=GV("sc-proj"),el=E("sc-result");if(!el)return;
