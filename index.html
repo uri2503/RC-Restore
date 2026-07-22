@@ -2996,7 +2996,7 @@ try{
   a.download='riedel-backup-'+new Date().toISOString().slice(0,10)+'.json';
   a.click();
   URL.revokeObjectURL(url);
-  toast('Backup gespeichert ('+Object.keys(smpData).map(function(k){return k+':'+smpData[k].length;}).join(', ')+')','ok');
+  toast('Backup gespeichert ('+Object.keys(smpData).map(function(k){var v=smpData[k];return k+':'+(Array.isArray(v)?v.length:(v?'✓':'—'));}).join(', ')+')','ok');
 }catch(e){toast('Fehler: '+e.message,'err');}
 }
 function importBackup(file){
