@@ -331,7 +331,12 @@ function saveData(){
     mitarbeiter: APP.smp.mitarbeiter||[],
     kw: APP.smp.kw||[],
     auf: APP.smp.auf||[],
-    id: APP.smp.id||[]
+    id: APP.smp.id||[],
+    // ag (Kalkulation/Firmendaten), rcdev (RC Dev) und docs (Angebote & Rechnungen) fehlten hier -
+    // dadurch wurden sie bei JEDEM Speichern serverseitig überschrieben/gelöscht, egal was ausgelöst hat.
+    ag: APP.smp.ag||{},
+    rcdev: APP.smp.rcdev||{},
+    docs: APP.smp.docs||{}
   };
 
   var pending = 2;
@@ -370,6 +375,9 @@ function loadDataAsync(callback){
       if(s.kw) APP.smp.kw = s.kw;
       if(s.auf) APP.smp.auf = s.auf;
       if(s.id) APP.smp.id = s.id;
+      if(s.ag) APP.smp.ag = s.ag;
+      if(s.rcdev) APP.smp.rcdev = s.rcdev;
+      if(s.docs) APP.smp.docs = s.docs;
     } else {
       // Try old localStorage key
       try {
@@ -382,6 +390,9 @@ function loadDataAsync(callback){
           if(od.kw) APP.smp.kw = od.kw;
           if(od.auf) APP.smp.auf = od.auf;
           if(od.id) APP.smp.id = od.id;
+          if(od.ag) APP.smp.ag = od.ag;
+          if(od.rcdev) APP.smp.rcdev = od.rcdev;
+          if(od.docs) APP.smp.docs = od.docs;
           // Migrate to IDB
           idbSet(SMP_KEY, od, function(){ try{localStorage.removeItem(SMP_KEY);}catch(e){} });
         }
@@ -2693,7 +2704,7 @@ function exportData(){
 var bk={version:"3.1",mandant:MANDANT,exported:new Date().toISOString(),
 cr:{vehicles:APP.data.vehicles,projects:APP.data.projects,gruppenVorlagen:APP.data.gruppenVorlagen,
 settings:APP.data.settings,arbeitsgaenge:APP.data.arbeitsgaenge,mitarbeiter:APP.data.mitarbeiter},
-smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[]}};
+smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[],ag:APP.smp.ag||null,rcdev:APP.smp.rcdev||null,docs:APP.smp.docs||null}};
 var json=JSON.stringify(bk,null,2);
 var b=new Blob([json],{type:"application/json"});var u=URL.createObjectURL(b);
 var a=document.createElement("a");a.href=u;a.download="riedel-backup-"+MANDANT+"-"+new Date().toISOString().slice(0,10)+".json";
@@ -2707,7 +2718,7 @@ try{
 var bk={version:"3.1",mandant:MANDANT,exported:new Date().toISOString(),
 cr:{vehicles:APP.data.vehicles,projects:APP.data.projects,gruppenVorlagen:APP.data.gruppenVorlagen,
 settings:APP.data.settings,arbeitsgaenge:APP.data.arbeitsgaenge,mitarbeiter:APP.data.mitarbeiter},
-smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[]}};
+smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[],ag:APP.smp.ag||null,rcdev:APP.smp.rcdev||null,docs:APP.smp.docs||null}};
 var json=JSON.stringify(bk,null,2);
 var b=new Blob([json],{type:"application/json"});var u=URL.createObjectURL(b);
 var stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
@@ -2742,6 +2753,7 @@ if(d.arbeitsgaenge)APP.data.arbeitsgaenge=d.arbeitsgaenge;
 if(d.mitarbeiter)APP.data.mitarbeiter=d.mitarbeiter;
 APP.smp.zeit=obj.smp.zeit||[];APP.smp.kundenprojekte=obj.smp.kundenprojekte||[];
 APP.smp.arbeitsgaenge=obj.smp.arbeitsgaenge||[];APP.smp.mitarbeiter=obj.smp.mitarbeiter||[];
+if(obj.smp.ag)APP.smp.ag=obj.smp.ag;if(obj.smp.rcdev)APP.smp.rcdev=obj.smp.rcdev;if(obj.smp.docs)APP.smp.docs=obj.smp.docs;
 for(var i=0;i<APP.data.vehicles.length;i++){var v=APP.data.vehicles[i];if(!v.bild)v.bild=[];if(!v.untB)v.untB=[];if(!v.untA)v.untA=[];if(!v.dok)v.dok=[];if(!v.smpProj)v.smpProj="";}
 for(var i=0;i<APP.data.projects.length;i++){var p2=APP.data.projects[i];if(!p2.smpProj)p2.smpProj="";if(!p2.teile)p2.teile=[];if(!p2.tagebuch)p2.tagebuch=[];if(!p2.demontage)p2.demontage=[];if(!p2.gruppen)p2.gruppen=[];}
 migrateMitarbeiter();
