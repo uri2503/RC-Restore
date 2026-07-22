@@ -2182,10 +2182,12 @@ agRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px soli
 var standorte=getStandorte(d);
 var standortRows="";
 for(var i=0;i<standorte.length;i++){var st=standorte[i];
-standortRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)\">"
+standortRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)"+(STANDORT_EDIT_ID===st.id?";background:var(--bg2)":"")+"\">"
 +"<span style=\"flex:1;font-size:13px\">"+esc(st.name)+"</span>"
 +"<span class=\"badge b-teal\" style=\"margin-right:8px\">"+(st.kapazitaet>0?st.kapazitaet+" Platz"+(st.kapazitaet===1?"":"e"):"keine Kapazität")+"</span>"
++"<button class=\"bic\" style=\"margin-right:4px\" onclick=\"editStandort('"+st.id+"')\">&#9998;</button>"
 +"<button class=\"bic\" onclick=\"delStandort('"+st.id+"')\">&#128465;</button></div>";}
+var standortEdit=STANDORT_EDIT_ID?standorte.filter(function(s){return s.id===STANDORT_EDIT_ID;})[0]:null;
 var maRows="";
 for(var i=0;i<d.mitarbeiter.length;i++){var ma=d.mitarbeiter[i];
 maRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)"+(MACR_EDIT_ID===ma.id?";background:var(--bg2)":"")+"\">"
@@ -2253,9 +2255,11 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#127981; Werkstatt-Ressourcen</div>"
 +"<div class=\"txs cm mb2\">Standorte (Hallen, Garagen, Stellplätze, ...) mit jeweils eigener Kapazität für die Kapazitätsprüfung in der Fertigungsplanung.</div>"
 +(standortRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+standortRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Standorte.</p>")
-+"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Bezeichnung</label><input class=\"fi\" id=\"wr-name\" placeholder=\"z.B. Garage 1, Halle A, Stellplatz Nord\"></div>"
-+"<div class=\"fg\"><label class=\"fl\">Kapazität (Plätze)</label><input class=\"fi\" type=\"number\" id=\"wr-kap\" min=\"0\" value=\"1\"></div></div>"
-+"<button class=\"btn btn-p btn-sm\" onclick=\"addStandort()\">+ Standort</button></div>"
++(standortEdit?"<div class=\"txs\" style=\"color:var(--red);margin-bottom:8px\">Bearbeite: "+esc(standortEdit.name)+"</div>":"")
++"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Bezeichnung</label><input class=\"fi\" id=\"wr-name\" placeholder=\"z.B. Garage 1, Halle A, Stellplatz Nord\" value=\""+(standortEdit?esc(standortEdit.name):"")+"\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Kapazität (Plätze)</label><input class=\"fi\" type=\"number\" id=\"wr-kap\" min=\"0\" value=\""+(standortEdit?standortEdit.kapazitaet:1)+"\"></div></div>"
++"<div class=\"flex g2p\"><button class=\"btn btn-p btn-sm\" onclick=\"saveStandort()\">"+(standortEdit?"Änderungen speichern":"+ Standort")+"</button>"
++(standortEdit?"<button class=\"btn btn-g btn-sm\" onclick=\"cancelStandortEdit()\">Abbrechen</button>":"")+"</div></div>"
 +"<div class=\"card mb3\"><div class=\"flex fac fjb mb2\"><span class=\"fw tsm\">&#128190; Speicher-Verwaltung</span>"
 +"<span id=\"stor-size\" class=\"txs cm\">...</span></div>"
 +"<div class=\"flex g2p\"><button class=\"btn btn-g btn-sm\" onclick=\"checkStorageUsage()\">Prüfen</button>"
@@ -2268,17 +2272,29 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128218; Wissensdatenbank URL</div><div style=\"font-size:11px;color:var(--text3);margin-bottom:8px\">URL der RC Know-How App (GitHub Pages)</div><div style=\"display:flex;gap:8px\"><input id=\"set-khurl\" class=\"fi\" style=\"flex:1\" placeholder=\"https://uri2503.github.io/RC-KnowHow/\" value=\""+(d.settings&&d.settings.knowhowUrl?d.settings.knowhowUrl:"")+"\"><button onclick=\"saveKnowHowUrl()\" class=\"btn btn-p btn-sm\">Speichern</button></div></div>"
 +"</div>";
 }
-function addStandort(){
+var STANDORT_EDIT_ID=null;
+function saveStandort(){
 var name=GV("wr-name").trim();
 if(!name){toast("Bitte Bezeichnung eingeben.","err");return;}
+var kap=GI("wr-kap")||0;
 var d=D();
-getStandorte(d).push({id:uid(),name:name,kapazitaet:GI("wr-kap")||0});
+if(STANDORT_EDIT_ID){
+var st=getStandorte(d).filter(function(s){return s.id===STANDORT_EDIT_ID;})[0];
+if(st){st.name=name;st.kapazitaet=kap;}
+STANDORT_EDIT_ID=null;
+saveData();render();toast("Änderungen gespeichert ✓","ok");
+}else{
+getStandorte(d).push({id:uid(),name:name,kapazitaet:kap});
 saveData();render();toast("Standort hinzugefügt ✓","ok");
 }
+}
+function editStandort(id){STANDORT_EDIT_ID=id;render();}
+function cancelStandortEdit(){STANDORT_EDIT_ID=null;render();}
 function delStandort(id){
 if(!confirm("Standort löschen?"))return;
 var d=D();
 d.settings.standorte=getStandorte(d).filter(function(s){return s.id!==id;});
+if(STANDORT_EDIT_ID===id)STANDORT_EDIT_ID=null;
 saveData();render();
 }
 function saveBK(){var d=D();d.settings.miete=parseFloat((document.getElementById('bk-miete')||{value:'0'}).value)||0;d.settings.strom=parseFloat((document.getElementById('bk-strom')||{value:'0'}).value)||0;d.settings.agk=parseFloat((document.getElementById('bk-agk')||{value:'0'}).value)||0;d.settings.personal=parseFloat((document.getElementById('bk-personal')||{value:'0'}).value)||0;var _bk=(+(d.settings.miete))+(+(d.settings.strom))+(+(d.settings.agk))+(+(d.settings.personal));saveData();render();toast('BK: '+_bk.toFixed(2)+'\u20ac/h | Ertrag: '+(d.settings.ss-_bk).toFixed(2)+'\u20ac/h \u2713','ok');}
