@@ -134,6 +134,17 @@ var BEREICHE=["Motor","Karosserie","Interieur","Fahrwerk","Elektrik","Getriebe",
 var WERKSTATT_TYPEN=[{key:"hebebuehne",label:"Hebeb\u00fchne"},{key:"strahlbuehne",label:"Strahlb\u00fchne"},{key:"lackierbox",label:"Lackierbox"},{key:"vorbereitung",label:"Vorbereitungsplatz"},{key:"aussenplatz",label:"Au\u00dfenplatz"}];
 var WERKSTATT_DEFAULT={hebebuehne:2,strahlbuehne:1,lackierbox:1,vorbereitung:2,aussenplatz:0};
 function getWTCap(d,key){var v=d.settings.werkstattTypen;return(v&&v[key]!=null)?v[key]:WERKSTATT_DEFAULT[key];}
+// Frei verwaltbare Standorte (Garagen, Hallen, Stellplätze, ...) ersetzen die 5 fest codierten
+// Werkstatt-Typen. Migriert einmalig aus d.settings.werkstattTypen — behält dabei bewusst die alten
+// Keys (hebebuehne, aussenplatz, ...) als id bei, damit bereits zugewiesene p.platzTyp-Werte gültig
+// bleiben, ohne bestehende Projekte anfassen zu müssen.
+function getStandorte(d){
+if(!d.settings.standorte){
+var wt=d.settings.werkstattTypen||{};
+d.settings.standorte=WERKSTATT_TYPEN.map(function(t){return{id:t.key,name:t.label,kapazitaet:(wt[t.key]!=null?wt[t.key]:WERKSTATT_DEFAULT[t.key])||0};});
+}
+return d.settings.standorte;
+}
 var APP={view:"dashboard",pid:null,pf:"",ps:"",zFilter:"",zSearch:"",data:{
 vehicles:[
 {id:"v1",marke:"Mercedes-Benz",modell:"300 SL",baujahr:1955,fnr:"198.040.5500012",kz:"MB-SL 300",farbe:"Silber",status:"In Restauration",km:48200,info:"Legend\u00e4rer Fl\u00fcgelt\u00fcrer.",bild:[],untB:[],untA:[],dok:[],smpProj:""},
@@ -674,10 +685,10 @@ feasible=remH<=m.wochenkapazitaet*weeks;
 }
 return{maId:m.id,name:m.name,weeklyCapH:m.wochenkapazitaet||0,remH:remH,weeksToDeadline:weeks,feasible:feasible,unknown:unknown};
 });
-var bays=WERKSTATT_TYPEN.map(function(wt){
-var capacity=getWTCap(d,wt.key);
-var active=activeProjects.filter(function(p){return p.platzTyp===wt.key;}).length;
-return{key:wt.key,label:wt.label,active:active,capacity:capacity,feasible:capacity>0?active<=capacity:null};
+var bays=getStandorte(d).map(function(st){
+var capacity=st.kapazitaet||0;
+var active=activeProjects.filter(function(p){return p.platzTyp===st.id;}).length;
+return{key:st.id,label:st.name,active:active,capacity:capacity,feasible:capacity>0?active<=capacity:null};
 });
 return{byMA:byMA,bays:bays};
 }
@@ -1062,7 +1073,7 @@ var bayRows=cc.bays.map(function(b){
 var stat=b.capacity>0?badge(b.feasible?"b-green":"b-red",b.active+" / "+b.capacity+" belegt"):badge("b-gray","nicht konfiguriert");
 return "<div class=\"flex fac fjb\" style=\"padding:4px 0\"><span class=\"tsm\">"+esc(b.label)+"</span>"+stat+"</div>";
 }).join("");
-var wtByKey={};WERKSTATT_TYPEN.forEach(function(wt){wtByKey[wt.key]=wt.label;});
+var wtByKey={};getStandorte(d).forEach(function(st){wtByKey[st.id]=st.name;});
 var cards=activeProjects.map(function(p){
 var v=getV(p.vid);
 var byMA=remHoursByMA(p);
@@ -2168,6 +2179,13 @@ agRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px soli
 +"<span class=\"txs cm\" style=\"margin-right:6px\">"+ag.rolle+"</span>"
 +"<span class=\"badge b-blue\" style=\"margin-right:8px\">"+ag.rate+"€/h</span>"
 +"<button class=\"bic\" onclick=\"delAG("+i+")\">&#128465;</button></div>";}
+var standorte=getStandorte(d);
+var standortRows="";
+for(var i=0;i<standorte.length;i++){var st=standorte[i];
+standortRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)\">"
++"<span style=\"flex:1;font-size:13px\">"+esc(st.name)+"</span>"
++"<span class=\"badge b-teal\" style=\"margin-right:8px\">"+(st.kapazitaet>0?st.kapazitaet+" Platz"+(st.kapazitaet===1?"":"e"):"keine Kapazität")+"</span>"
++"<button class=\"bic\" onclick=\"delStandort('"+st.id+"')\">&#128465;</button></div>";}
 var maRows="";
 for(var i=0;i<d.mitarbeiter.length;i++){var ma=d.mitarbeiter[i];
 maRows+="<div class=\"flex fac\" style=\"padding:8px 12px;border-bottom:1px solid var(--bg3)"+(MACR_EDIT_ID===ma.id?";background:var(--bg2)":"")+"\">"
@@ -2233,9 +2251,11 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"flex g2p\"><button class=\"btn btn-p btn-sm\" onclick=\"saveMACR()\">"+(macrEdit?"Änderungen speichern":"+ Mitarbeiter")+"</button>"
 +(macrEdit?"<button class=\"btn btn-g btn-sm\" onclick=\"cancelMACREdit()\">Abbrechen</button>":"")+"</div></div>"
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#127981; Werkstatt-Ressourcen</div>"
-+"<div class=\"txs cm mb2\">Anzahl paralleler Plätze je Bereich für die Kapazitätsprüfung in der Fertigungsplanung.</div>"
-+"<div class=\"frow\">"+WERKSTATT_TYPEN.map(function(wt){return "<div class=\"fg\"><label class=\"fl\">"+wt.label+"</label><input type=\"number\" class=\"fi\" id=\"wr-"+wt.key+"\" min=\"0\" value=\""+getWTCap(d,wt.key)+"\"></div>";}).join("")+"</div>"
-+"<button class=\"btn btn-p btn-sm\" onclick=\"saveWR()\">Speichern</button></div>"
++"<div class=\"txs cm mb2\">Standorte (Hallen, Garagen, Stellplätze, ...) mit jeweils eigener Kapazität für die Kapazitätsprüfung in der Fertigungsplanung.</div>"
++(standortRows?"<div style=\"border:1px solid var(--border);border-radius:6px;margin-bottom:12px\">"+standortRows+"</div>":"<p class=\"txs cm mb3\">Noch keine Standorte.</p>")
++"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Bezeichnung</label><input class=\"fi\" id=\"wr-name\" placeholder=\"z.B. Garage 1, Halle A, Stellplatz Nord\"></div>"
++"<div class=\"fg\"><label class=\"fl\">Kapazität (Plätze)</label><input class=\"fi\" type=\"number\" id=\"wr-kap\" min=\"0\" value=\"1\"></div></div>"
++"<button class=\"btn btn-p btn-sm\" onclick=\"addStandort()\">+ Standort</button></div>"
 +"<div class=\"card mb3\"><div class=\"flex fac fjb mb2\"><span class=\"fw tsm\">&#128190; Speicher-Verwaltung</span>"
 +"<span id=\"stor-size\" class=\"txs cm\">...</span></div>"
 +"<div class=\"flex g2p\"><button class=\"btn btn-g btn-sm\" onclick=\"checkStorageUsage()\">Prüfen</button>"
@@ -2248,7 +2268,19 @@ return "<div class=\"flex fjb mb3\"><span class=\"tsm cm\">=&nbsp;Ertrag/h:</spa
 +"<div class=\"card mb3\"><div class=\"fw tsm mb3\">&#128218; Wissensdatenbank URL</div><div style=\"font-size:11px;color:var(--text3);margin-bottom:8px\">URL der RC Know-How App (GitHub Pages)</div><div style=\"display:flex;gap:8px\"><input id=\"set-khurl\" class=\"fi\" style=\"flex:1\" placeholder=\"https://uri2503.github.io/RC-KnowHow/\" value=\""+(d.settings&&d.settings.knowhowUrl?d.settings.knowhowUrl:"")+"\"><button onclick=\"saveKnowHowUrl()\" class=\"btn btn-p btn-sm\">Speichern</button></div></div>"
 +"</div>";
 }
-function saveWR(){var d=D();var wt={};WERKSTATT_TYPEN.forEach(function(w){wt[w.key]=GI("wr-"+w.key)||0;});d.settings.werkstattTypen=wt;saveData();render();toast("Werkstatt-Ressourcen gespeichert ✓","ok");}
+function addStandort(){
+var name=GV("wr-name").trim();
+if(!name){toast("Bitte Bezeichnung eingeben.","err");return;}
+var d=D();
+getStandorte(d).push({id:uid(),name:name,kapazitaet:GI("wr-kap")||0});
+saveData();render();toast("Standort hinzugefügt ✓","ok");
+}
+function delStandort(id){
+if(!confirm("Standort löschen?"))return;
+var d=D();
+d.settings.standorte=getStandorte(d).filter(function(s){return s.id!==id;});
+saveData();render();
+}
 function saveBK(){var d=D();d.settings.miete=parseFloat((document.getElementById('bk-miete')||{value:'0'}).value)||0;d.settings.strom=parseFloat((document.getElementById('bk-strom')||{value:'0'}).value)||0;d.settings.agk=parseFloat((document.getElementById('bk-agk')||{value:'0'}).value)||0;d.settings.personal=parseFloat((document.getElementById('bk-personal')||{value:'0'}).value)||0;var _bk=(+(d.settings.miete))+(+(d.settings.strom))+(+(d.settings.agk))+(+(d.settings.personal));saveData();render();toast('BK: '+_bk.toFixed(2)+'\u20ac/h | Ertrag: '+(d.settings.ss-_bk).toFixed(2)+'\u20ac/h \u2713','ok');}
 function openM(h,lg){
 E("MOD").innerHTML="<div class=\"movl\" id=\"MOVL\"><div class=\"modal"+(lg?" modal-lg":"")+"\" id=\"MBOX\">"+h+"</div></div>";
@@ -2396,7 +2428,7 @@ openM(MH(p?"Projekt bearbeiten":"Neues Projekt")
 +"<option value=\"intern\""+(art==="intern"?" selected":"")+">Intern (Eigenbestand/Wiederverkauf)</option></select></div>"
 +"<div class=\"fg\"><label class=\"fl\">Aktueller Werkstatt-Platz</label><select class=\"fsel\" id=\"pm-pt\">"
 +"<option value=\"\""+(!p||!p.platzTyp?" selected":"")+">-- kein Platz zugewiesen --</option>"
-+WERKSTATT_TYPEN.map(function(wt){return "<option value=\""+wt.key+"\""+(p&&p.platzTyp===wt.key?" selected":"")+">"+wt.label+"</option>";}).join("")
++getStandorte(d).map(function(st){return "<option value=\""+st.id+"\""+(p&&p.platzTyp===st.id?" selected":"")+">"+esc(st.name)+"</option>";}).join("")
 +"</select></div>"
 +"<div class=\"frow\"><div class=\"fg\"><label class=\"fl\">Start</label><input class=\"fi\" type=\"date\" id=\"pm-sd\" value=\""+(p?p.start:"")+"\"></div>"
 +"<div class=\"fg\"><label class=\"fl\">Ziel</label><input class=\"fi\" type=\"date\" id=\"pm-ed\" value=\""+(p?p.ende:"")+"\"></div></div>"
