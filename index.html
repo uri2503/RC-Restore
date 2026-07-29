@@ -2935,6 +2935,45 @@ t.kat=(document.getElementById('we-kat')||{}).value||'';
 W_EDIT_I=-1;
 saveKW(kw);nav('woche');
 }
+// Aufgabe auf einen anderen Tag derselben Woche verschieben - per Zieh-Griff (Pointer Events, damit es
+// auch auf iPad/iPhone per Touch funktioniert, nicht nur mit der Maus) auf einen Tag in der linken
+// Leiste ziehen, oder per "▶"-Schnellaktion direkt auf morgen.
+var W_DRAG_IDX=-1;
+function wDragStart(e,i){
+W_DRAG_IDX=i;
+try{e.target.setPointerCapture(e.pointerId);}catch(err){}
+e.target.style.cursor='grabbing';
+var row=e.target.closest('.ri');if(row)row.style.opacity='0.5';
+}
+function wDragMove(e){
+if(W_DRAG_IDX<0)return;
+document.querySelectorAll('.db[data-day]').forEach(function(b){b.style.outline='';});
+var el=document.elementFromPoint(e.clientX,e.clientY);
+var db=el&&el.closest?el.closest('.db[data-day]'):null;
+if(db)db.style.outline='2px dashed var(--red)';
+}
+function wDragEnd(e){
+if(W_DRAG_IDX<0)return;
+var el=document.elementFromPoint(e.clientX,e.clientY);
+var db=el&&el.closest?el.closest('.db[data-day]'):null;
+document.querySelectorAll('.db[data-day]').forEach(function(b){b.style.outline='';});
+var row=e.target.closest('.ri');if(row)row.style.opacity='';
+e.target.style.cursor='grab';
+var idx=W_DRAG_IDX;W_DRAG_IDX=-1;
+if(db){var day=parseInt(db.getAttribute('data-day'));if(!isNaN(day))wMoveTask(idx,day);}
+}
+function wMoveTask(i,targetDay){
+if(targetDay===PD||targetDay<0||targetDay>6)return;
+var kw=getKW(PW2,PY);
+if(!kw.tage[PD]||!kw.tage[PD][i])return;
+var t=kw.tage[PD].splice(i,1)[0];
+if(!kw.tage[targetDay])kw.tage[targetDay]=[];
+kw.tage[targetDay].push(t);
+W_EDIT_I=-1;
+saveKW(kw);
+toast('Verschoben nach '+DL[targetDay]+' ✓','ok');
+nav('woche');
+}
 function aDel(i){smpDB().auf.splice(i,1);saveDB();nav('auf');}
 function padDel(pi,ai){if(APP.data.projects[pi]&&APP.data.projects[pi].auf)APP.data.projects[pi].auf.splice(ai,1);saveData();nav('auf');}
 function wNotizTA(ta){var kw=getKW(PW2,PY);if(!kw.notizen)kw.notizen={};kw.notizen[PD]=ta.value;saveKW(kw);}
@@ -3345,7 +3384,7 @@ sopts+='<option value="'+o.week+'_'+o.year+'"'+(PW2===o.week&&PY===o.year?' sele
 var sb=''; for(var i=0;i<7;i++){
 var es=kw.tage[i]||[],cnt=es.length,dn=0; for(var j=0;j<es.length;j++) if(es[j].done) dn++;
 var isA=(PD===i),isT=(wd[i].toDateString()===TODAY.toDateString());
-sb+='<button class="db'+(isA?' on':'')+(isT?' td':'')+'" onclick="setPD('+i+')">'
+sb+='<button class="db'+(isA?' on':'')+(isT?' td':'')+'" data-day="'+i+'" onclick="setPD('+i+')">'
 +'<div><div class="dn2">'+DS[i]+(isT?' ·':'')+' </div><div class="ddt">'+fmt(wd[i])+'</div></div>'
 +(cnt>0?'<span style="font-size:10px;color:'+(dn===cnt?'#4ADE80':'#64748B')+'">'+dn+'/'+cnt+'</span>':'')
 +'</button>';
@@ -3368,7 +3407,11 @@ rows+='<div class="ri" style="flex-wrap:wrap;gap:6px;background:var(--bg2)">'
 +'<button class="xb" onclick="wCancelEdit()">&#215;</button>'
 +'</div>';
 }else{
-rows+='<div class="ri">'+'<input type="checkbox"'+(de[i].done?' checked':'')+' onchange="wToggle('+i+',this.checked)">'+(de[i].prioritaet?'<div class="dot" style="background:'+(PC[de[i].prioritaet]||'#888')+';"></div>':'')+(de[i].kat?'<span class="zt-proj" style="margin-right:2px">'+esc(de[i].kat)+'</span>':'')+'<span class="rt'+(de[i].done?' dn':'')+'">'+esc(de[i].text)+'</span>'+'<button class="xb" onclick="wStartEdit('+i+')" title="Bearbeiten">&#9998;</button>'+'<button class="xb" onclick="wDel('+i+')">&#215;</button>'+'</div>';
+rows+='<div class="ri">'
++'<span onpointerdown="wDragStart(event,'+i+')" onpointermove="wDragMove(event)" onpointerup="wDragEnd(event)" onpointercancel="wDragEnd(event)" style="cursor:grab;color:var(--text3);padding:0 2px 0 0;touch-action:none;user-select:none" title="Ziehen zum Verschieben">&#9776;</span>'
++'<input type="checkbox"'+(de[i].done?' checked':'')+' onchange="wToggle('+i+',this.checked)">'+(de[i].prioritaet?'<div class="dot" style="background:'+(PC[de[i].prioritaet]||'#888')+';"></div>':'')+(de[i].kat?'<span class="zt-proj" style="margin-right:2px">'+esc(de[i].kat)+'</span>':'')+'<span class="rt'+(de[i].done?' dn':'')+'">'+esc(de[i].text)+'</span>'
++(PD<6?'<button class="xb" onclick="wMoveTask('+i+','+(PD+1)+')" title="Auf morgen verschieben">&#9654;</button>':'')
++'<button class="xb" onclick="wStartEdit('+i+')" title="Bearbeiten">&#9998;</button>'+'<button class="xb" onclick="wDel('+i+')">&#215;</button>'+'</div>';
 }
 }
 var prog=tot>0?'<span style="font-size:11px;color:#64748B;margin-left:auto">'+don+'/'+tot+'</span>':'';
