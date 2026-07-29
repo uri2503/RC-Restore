@@ -2917,7 +2917,24 @@ function uid(){return uid2();}
 function wToggle(i,v){var kw=getKW(PW2,PY);if(kw.tage[PD]&&kw.tage[PD][i]){kw.tage[PD][i].done=v;saveKW(kw);nav('woche');}}
 function aToggle(i,v){smpDB().auf[i].done=v;saveDB();nav('auf');}
 function patToggle(pi,ai,v){if(APP.data.projects[pi]&&APP.data.projects[pi].auf&&APP.data.projects[pi].auf[ai]){APP.data.projects[pi].auf[ai].done=v;saveData();nav('auf');}}
-function wDel(i){var kw=getKW(PW2,PY);if(kw.tage[PD])(kw.tage[PD]).splice(i,1);saveKW(kw);nav('woche');}
+function wDel(i){var kw=getKW(PW2,PY);if(kw.tage[PD])(kw.tage[PD]).splice(i,1);W_EDIT_I=-1;saveKW(kw);nav('woche');}
+// Bearbeiten einer bestehenden Tagesaufgabe (Text/Kategorie/Priorität) - vorher nur Erledigt-Haken
+// und Löschen möglich. Index-basiert wie wToggle()/wDel(), bezieht sich auf kw.tage[PD].
+var W_EDIT_I=-1;
+function wStartEdit(i){W_EDIT_I=i;nav('woche');}
+function wCancelEdit(){W_EDIT_I=-1;nav('woche');}
+function wSaveEdit(i){
+var kw=getKW(PW2,PY);
+var t=kw.tage[PD]&&kw.tage[PD][i];
+if(!t)return;
+var txt=(document.getElementById('we-text')||{}).value;
+if(!txt||!txt.trim()){toast('Text darf nicht leer sein.','err');return;}
+t.text=txt.trim();
+t.prioritaet=(document.getElementById('we-prio')||{}).value||'';
+t.kat=(document.getElementById('we-kat')||{}).value||'';
+W_EDIT_I=-1;
+saveKW(kw);nav('woche');
+}
 function aDel(i){smpDB().auf.splice(i,1);saveDB();nav('auf');}
 function padDel(pi,ai){if(APP.data.projects[pi]&&APP.data.projects[pi].auf)APP.data.projects[pi].auf.splice(ai,1);saveData();nav('auf');}
 function wNotizTA(ta){var kw=getKW(PW2,PY);if(!kw.notizen)kw.notizen={};kw.notizen[PD]=ta.value;saveKW(kw);}
@@ -3335,12 +3352,26 @@ sb+='<button class="db'+(isA?' on':'')+(isT?' td':'')+'" onclick="setPD('+i+')">
 }
 var de=kw.tage[PD]||[],dn2=(kw.notizen&&kw.notizen[PD])||'';
 var isT2=(wd[PD].toDateString()===TODAY.toDateString());
-var rows='';
-if(de.length===0) rows='<p style="color:#64748B;font-size:12px;text-align:center;padding:14px">Noch keine Einträge</p>';
-else for(var i=0;i<de.length;i++) rows+='<div class="ri">'+'<input type="checkbox"'+(de[i].done?' checked':'')+' onchange="wToggle('+i+',this.checked)">'+(de[i].prioritaet?'<div class="dot" style="background:'+(PC[de[i].prioritaet]||'#888')+';"></div>':'')+(de[i].kat?'<span class="zt-proj" style="margin-right:2px">'+esc(de[i].kat)+'</span>':'')+'<span class="rt'+(de[i].done?' dn':'')+'">'+esc(de[i].text)+'</span>'+'<button class="xb" onclick="wDel('+i+')">&#215;</button>'+'</div>';
-var prog=tot>0?'<span style="font-size:11px;color:#64748B;margin-left:auto">'+don+'/'+tot+'</span>':'';
 var katList=wkKatDB();
 var katOpts=katList.map(function(kt){return '<option value="'+esc(kt.name)+'">'+esc(kt.name)+'</option>';}).join('');
+var prioOpts=function(sel){return '<option value="hoch"'+(sel==='hoch'?' selected':'')+'>🔴</option><option value="mittel"'+(sel==='mittel'?' selected':'')+'>🟠</option><option value="niedrig"'+(sel==='niedrig'?' selected':'')+'>🟢</option><option value=""'+(!sel?' selected':'')+'>—</option>';};
+var rows='';
+if(de.length===0) rows='<p style="color:#64748B;font-size:12px;text-align:center;padding:14px">Noch keine Einträge</p>';
+else for(var i=0;i<de.length;i++){
+if(i===W_EDIT_I){
+var ekatOpts=katList.map(function(kt){return '<option value="'+esc(kt.name)+'"'+(de[i].kat===kt.name?' selected':'')+'>'+esc(kt.name)+'</option>';}).join('');
+rows+='<div class="ri" style="flex-wrap:wrap;gap:6px;background:var(--bg2)">'
++'<input class="inp" id="we-text" style="flex:1;min-width:160px" value="'+esc(de[i].text)+'">'
++'<select class="inp" id="we-kat" style="width:120px;flex:none"><option value="">Kategorie</option>'+ekatOpts+'</select>'
++'<select class="inp" id="we-prio" style="width:72px;flex:none">'+prioOpts(de[i].prioritaet)+'</select>'
++'<button class="ab" style="background:#3d7a5222;color:#3d7a52;border-color:#3d7a5233" onclick="wSaveEdit('+i+')">&#10003;</button>'
++'<button class="xb" onclick="wCancelEdit()">&#215;</button>'
++'</div>';
+}else{
+rows+='<div class="ri">'+'<input type="checkbox"'+(de[i].done?' checked':'')+' onchange="wToggle('+i+',this.checked)">'+(de[i].prioritaet?'<div class="dot" style="background:'+(PC[de[i].prioritaet]||'#888')+';"></div>':'')+(de[i].kat?'<span class="zt-proj" style="margin-right:2px">'+esc(de[i].kat)+'</span>':'')+'<span class="rt'+(de[i].done?' dn':'')+'">'+esc(de[i].text)+'</span>'+'<button class="xb" onclick="wStartEdit('+i+')" title="Bearbeiten">&#9998;</button>'+'<button class="xb" onclick="wDel('+i+')">&#215;</button>'+'</div>';
+}
+}
+var prog=tot>0?'<span style="font-size:11px;color:#64748B;margin-left:auto">'+don+'/'+tot+'</span>':'';
 var katRows=katList.map(function(kt){
 return '<div class="flex fac" style="padding:6px 10px;border-bottom:1px solid var(--bg3)">'
 +'<span style="flex:1;font-size:12px">'+esc(kt.name)+'</span>'
@@ -3383,13 +3414,13 @@ return '<div class="card" style="padding:0;overflow:hidden">'
 +'<textarea class="inp" id="wn" placeholder="Notizen…" oninput="wNotiz(this)">'+esc(dn2)+'</textarea>'
 +'</div></div></div></div>';
 }
-function setPD(i){ PD=i; renderSMPPage('woche'); }
+function setPD(i){ PD=i; W_EDIT_I=-1; renderSMPPage('woche'); }
 function kwNav(d){
 var opts=wo(),idx=wIdx(opts,PW2,PY);
-var nx=opts[idx+d]; if(nx){PW2=nx.week;PY=nx.year;renderSMPPage("woche");}
+var nx=opts[idx+d]; if(nx){PW2=nx.week;PY=nx.year;W_EDIT_I=-1;renderSMPPage("woche");}
 }
 function kwSel(sel){
-var v=sel.value.split('_');PW2=parseInt(v[0]);PY=parseInt(v[1]);renderSMPPage('woche');
+var v=sel.value.split('_');PW2=parseInt(v[0]);PY=parseInt(v[1]);W_EDIT_I=-1;renderSMPPage('woche');
 }
 function wAdd(){
 var inp=document.getElementById('wi'),p=document.getElementById('wp'),kat=document.getElementById('wkat');
@@ -3460,7 +3491,7 @@ return '<div class="ri" style="cursor:pointer" onclick="jumpToWocheTask('+m.kw.w
 +'</div>';
 }).join('');
 }
-function jumpToWocheTask(w,y,d){PW2=w;PY=y;PD=d;WOCHE_SEARCH='';nav('woche');}
+function jumpToWocheTask(w,y,d){PW2=w;PY=y;PD=d;WOCHE_SEARCH='';W_EDIT_I=-1;nav('woche');}
 function wNotiz(ta){
 var kw=getKW(PW2,PY);
 if(!kw.notizen)kw.notizen={};
