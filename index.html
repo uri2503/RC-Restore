@@ -347,7 +347,8 @@ function saveData(){
     // dadurch wurden sie bei JEDEM Speichern serverseitig überschrieben/gelöscht, egal was ausgelöst hat.
     ag: APP.smp.ag||{},
     rcdev: APP.smp.rcdev||{},
-    docs: APP.smp.docs||{}
+    docs: APP.smp.docs||{},
+    wkKategorien: APP.smp.wkKategorien||[]
   };
 
   var pending = 2;
@@ -389,6 +390,7 @@ function loadDataAsync(callback){
       if(s.ag) APP.smp.ag = s.ag;
       if(s.rcdev) APP.smp.rcdev = s.rcdev;
       if(s.docs) APP.smp.docs = s.docs;
+      if(s.wkKategorien) APP.smp.wkKategorien = s.wkKategorien;
     } else {
       // Try old localStorage key
       try {
@@ -404,6 +406,7 @@ function loadDataAsync(callback){
           if(od.ag) APP.smp.ag = od.ag;
           if(od.rcdev) APP.smp.rcdev = od.rcdev;
           if(od.docs) APP.smp.docs = od.docs;
+          if(od.wkKategorien) APP.smp.wkKategorien = od.wkKategorien;
           // Migrate to IDB
           idbSet(SMP_KEY, od, function(){ try{localStorage.removeItem(SMP_KEY);}catch(e){} });
         }
@@ -2752,7 +2755,7 @@ function exportData(){
 var bk={version:"3.1",mandant:MANDANT,exported:new Date().toISOString(),
 cr:{vehicles:APP.data.vehicles,projects:APP.data.projects,gruppenVorlagen:APP.data.gruppenVorlagen,
 settings:APP.data.settings,arbeitsgaenge:APP.data.arbeitsgaenge,mitarbeiter:APP.data.mitarbeiter},
-smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[],ag:APP.smp.ag||null,rcdev:APP.smp.rcdev||null,docs:APP.smp.docs||null}};
+smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[],ag:APP.smp.ag||null,rcdev:APP.smp.rcdev||null,docs:APP.smp.docs||null,wkKategorien:APP.smp.wkKategorien||[]}};
 var json=JSON.stringify(bk,null,2);
 var b=new Blob([json],{type:"application/json"});var u=URL.createObjectURL(b);
 var a=document.createElement("a");a.href=u;a.download="riedel-backup-"+MANDANT+"-"+new Date().toISOString().slice(0,10)+".json";
@@ -2766,7 +2769,7 @@ try{
 var bk={version:"3.1",mandant:MANDANT,exported:new Date().toISOString(),
 cr:{vehicles:APP.data.vehicles,projects:APP.data.projects,gruppenVorlagen:APP.data.gruppenVorlagen,
 settings:APP.data.settings,arbeitsgaenge:APP.data.arbeitsgaenge,mitarbeiter:APP.data.mitarbeiter},
-smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[],ag:APP.smp.ag||null,rcdev:APP.smp.rcdev||null,docs:APP.smp.docs||null}};
+smp:{zeit:APP.smp.zeit||[],kundenprojekte:APP.smp.kundenprojekte||[],arbeitsgaenge:APP.smp.arbeitsgaenge||[],mitarbeiter:APP.smp.mitarbeiter||[],ag:APP.smp.ag||null,rcdev:APP.smp.rcdev||null,docs:APP.smp.docs||null,wkKategorien:APP.smp.wkKategorien||[]}};
 var json=JSON.stringify(bk,null,2);
 var b=new Blob([json],{type:"application/json"});var u=URL.createObjectURL(b);
 var stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
@@ -2801,7 +2804,7 @@ if(d.arbeitsgaenge)APP.data.arbeitsgaenge=d.arbeitsgaenge;
 if(d.mitarbeiter)APP.data.mitarbeiter=d.mitarbeiter;
 APP.smp.zeit=obj.smp.zeit||[];APP.smp.kundenprojekte=obj.smp.kundenprojekte||[];
 APP.smp.arbeitsgaenge=obj.smp.arbeitsgaenge||[];APP.smp.mitarbeiter=obj.smp.mitarbeiter||[];
-if(obj.smp.ag)APP.smp.ag=obj.smp.ag;if(obj.smp.rcdev)APP.smp.rcdev=obj.smp.rcdev;if(obj.smp.docs)APP.smp.docs=obj.smp.docs;
+if(obj.smp.ag)APP.smp.ag=obj.smp.ag;if(obj.smp.rcdev)APP.smp.rcdev=obj.smp.rcdev;if(obj.smp.docs)APP.smp.docs=obj.smp.docs;if(obj.smp.wkKategorien)APP.smp.wkKategorien=obj.smp.wkKategorien;
 for(var i=0;i<APP.data.vehicles.length;i++){var v=APP.data.vehicles[i];if(!v.bild)v.bild=[];if(!v.untB)v.untB=[];if(!v.untA)v.untA=[];if(!v.dok)v.dok=[];if(!v.smpProj)v.smpProj="";}
 for(var i=0;i<APP.data.projects.length;i++){var p2=APP.data.projects[i];if(!p2.smpProj)p2.smpProj="";if(!p2.teile)p2.teile=[];if(!p2.tagebuch)p2.tagebuch=[];if(!p2.demontage)p2.demontage=[];if(!p2.gruppen)p2.gruppen=[];}
 migrateMitarbeiter();
@@ -3028,7 +3031,8 @@ try{
     id:APP.smp.id||[],
     ag:APP.smp.ag||null,
     rcdev:APP.smp.rcdev||null,
-    docs:APP.smp.docs||null
+    docs:APP.smp.docs||null,
+    wkKategorien:APP.smp.wkKategorien||[]
   };
   var backup={
     version:'4.0',
@@ -3107,6 +3111,7 @@ try{
   if(smpData.ag) APP.smp.ag=smpData.ag;
   if(smpData.rcdev) APP.smp.rcdev=smpData.rcdev;
   if(smpData.docs) APP.smp.docs=smpData.docs;
+  if(smpData.wkKategorien) APP.smp.wkKategorien=smpData.wkKategorien;
   migrateMitarbeiter();
   saveData();
   toast((rmData.vehicles.length||0)+' Fzg, '+(rmData.projects.length||0)+' Proj importiert','ok');
@@ -3332,8 +3337,25 @@ var de=kw.tage[PD]||[],dn2=(kw.notizen&&kw.notizen[PD])||'';
 var isT2=(wd[PD].toDateString()===TODAY.toDateString());
 var rows='';
 if(de.length===0) rows='<p style="color:#64748B;font-size:12px;text-align:center;padding:14px">Noch keine Einträge</p>';
-else for(var i=0;i<de.length;i++) rows+='<div class="ri">'+'<input type="checkbox"'+(de[i].done?' checked':'')+' onchange="wToggle('+i+',this.checked)">'+(de[i].prioritaet?'<div class="dot" style="background:'+(PC[de[i].prioritaet]||'#888')+';"></div>':'')+'<span class="rt'+(de[i].done?' dn':'')+'">'+esc(de[i].text)+'</span>'+'<button class="xb" onclick="wDel('+i+')">&#215;</button>'+'</div>';
+else for(var i=0;i<de.length;i++) rows+='<div class="ri">'+'<input type="checkbox"'+(de[i].done?' checked':'')+' onchange="wToggle('+i+',this.checked)">'+(de[i].prioritaet?'<div class="dot" style="background:'+(PC[de[i].prioritaet]||'#888')+';"></div>':'')+(de[i].kat?'<span class="zt-proj" style="margin-right:2px">'+esc(de[i].kat)+'</span>':'')+'<span class="rt'+(de[i].done?' dn':'')+'">'+esc(de[i].text)+'</span>'+'<button class="xb" onclick="wDel('+i+')">&#215;</button>'+'</div>';
 var prog=tot>0?'<span style="font-size:11px;color:#64748B;margin-left:auto">'+don+'/'+tot+'</span>':'';
+var katList=wkKatDB();
+var katOpts=katList.map(function(kt){return '<option value="'+esc(kt.name)+'">'+esc(kt.name)+'</option>';}).join('');
+var katRows=katList.map(function(kt){
+return '<div class="flex fac" style="padding:6px 10px;border-bottom:1px solid var(--bg3)">'
++'<span style="flex:1;font-size:12px">'+esc(kt.name)+'</span>'
++'<button class="bic" style="margin-right:4px" onclick="renameWKKat(\''+kt.id+'\')">&#9998;</button>'
++'<button class="bic" onclick="delWKKat(\''+kt.id+'\')">&#128465;</button></div>';
+}).join('');
+var katManage='<details style="padding:8px 14px;border-bottom:1px solid var(--border)"><summary style="cursor:pointer;font-size:11px;color:var(--text3)">&#9881; Kategorien verwalten ('+katList.length+')</summary>'
++'<div style="margin:8px 0;border:1px solid var(--border);border-radius:6px;max-width:320px">'+(katRows||'<div class="txs cm" style="padding:8px">Noch keine Kategorien.</div>')+'</div>'
++'<div class="ir" style="max-width:320px"><input class="inp" id="wkat-name" placeholder="Neue Kategorie, z.B. Schraube"/>'
++'<button class="ab" style="background:#6382FF22;color:#6382FF;border-color:#6382FF33" onclick="addWKKat()">+</button></div>'
++'</details>';
+var searchBox='<div style="padding:10px 14px;border-bottom:1px solid var(--border)">'
++'<input class="inp" placeholder="&#128269; Archiv durchsuchen (alle Wochen)…" value="'+esc(WOCHE_SEARCH)+'" oninput="wocheSearchInput(this.value)">'
++'<div id="w-search-results" style="margin-top:8px">'+wocheSearchResults()+'</div>'
++'</div>';
 return '<div class="card" style="padding:0;overflow:hidden">'
 +'<div class="kwb">'
 +'<span style="font-size:14px">📆</span><b style="font-size:13px">Wochenplanung</b>'
@@ -3343,6 +3365,8 @@ return '<div class="card" style="padding:0;overflow:hidden">'
 +'<span style="font-size:11px;color:#64748B">'+fmt(wd[0])+'–'+fmt(wd[6])+'</span>'
 +(PW2===CW&&PY===CY?'<span style="color:#6382FF;font-size:10px;font-weight:700">Aktuell</span>':'')
 +prog+'</div>'
++searchBox
++katManage
 +'<div class="ww"><div class="dsb">'+sb+'</div>'
 +'<div class="dct">'
 +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">'
@@ -3351,6 +3375,7 @@ return '<div class="card" style="padding:0;overflow:hidden">'
 +(isT2?'<span style="color:#6382FF;font-size:10px;font-weight:700;background:#6382FF18;padding:2px 8px;border-radius:20px">Heute</span>':'')
 +'</div>'
 +'<div class="ir"><input class="inp" id="wi" placeholder="Eintrag für '+DS[PD]+'…"/>'
++'<select class="inp" id="wkat" style="width:130px;flex:none"><option value="">Kategorie</option>'+katOpts+'</select>'
 +'<select class="inp" id="wp" style="width:72px;flex:none"><option value="hoch">🔴</option><option value="mittel" selected>🟠</option><option value="niedrig">🟢</option><option value="">—</option></select>'
 +'<button class="ab" style="background:#6382FF22;color:#6382FF;border-color:#6382FF33" onclick="wAdd()">+</button></div>'
 +rows
@@ -3367,13 +3392,75 @@ function kwSel(sel){
 var v=sel.value.split('_');PW2=parseInt(v[0]);PY=parseInt(v[1]);renderSMPPage('woche');
 }
 function wAdd(){
-var inp=document.getElementById('wi'),p=document.getElementById('wp');
+var inp=document.getElementById('wi'),p=document.getElementById('wp'),kat=document.getElementById('wkat');
 if(!inp||!inp.value.trim())return;
 var kw=getKW(PW2,PY);
 if(!kw.tage[PD])kw.tage[PD]=[];
-kw.tage[PD].push({id:uid(),text:inp.value.trim(),done:false,prioritaet:p?p.value:''});
+kw.tage[PD].push({id:uid(),text:inp.value.trim(),done:false,prioritaet:p?p.value:'',kat:kat?kat.value:''});
 saveKW(kw);inp.value='';nav('woche');
 }
+// Frei verwaltbare Kategorien für Tagesaufgaben (z.B. "Schraube", "Bremse", "Achse" bei
+// Teile-Bestellungen) - gespeichert als Klartext-Name direkt am Task (wie prioritaet), nicht als id,
+// damit die Anzeige ohne Lookup funktioniert. renameWKKat() zieht bereits zugewiesene Aufgaben mit.
+function wkKatDB(){smpDB();if(!APP.smp.wkKategorien)APP.smp.wkKategorien=[];return APP.smp.wkKategorien;}
+function addWKKat(){
+var inp=document.getElementById('wkat-name');
+var name=inp?inp.value.trim():'';
+if(!name){toast('Bitte Namen eingeben.','err');return;}
+var list=wkKatDB();
+for(var i=0;i<list.length;i++)if(list[i].name.toLowerCase()===name.toLowerCase()){toast('Kategorie bereits vorhanden.','err');return;}
+list.push({id:uid2(),name:name});
+saveDB();nav('woche');
+}
+function renameWKKat(id){
+var list=wkKatDB();
+var k=list.filter(function(x){return x.id===id;})[0];
+if(!k)return;
+var nn=prompt('Neuer Name für Kategorie:',k.name);
+if(!nn||!nn.trim()||nn.trim()===k.name)return;
+nn=nn.trim();
+var old=k.name;
+k.name=nn;
+var s=smpDB();
+for(var i=0;i<s.kw.length;i++){var kwo=s.kw[i];for(var d=0;d<7;d++){var arr=kwo.tage[d];if(!arr)continue;for(var j=0;j<arr.length;j++){if(arr[j].kat===old)arr[j].kat=nn;}}}
+saveDB();nav('woche');
+}
+function delWKKat(id){
+if(!confirm('Kategorie löschen? Bereits zugewiesene Aufgaben behalten das Label, sind aber nicht mehr auswählbar.'))return;
+APP.smp.wkKategorien=wkKatDB().filter(function(k){return k.id!==id;});
+saveDB();nav('woche');
+}
+// Archiv-Suche über ALLE Wochen (nicht nur die aktuell angezeigte) - kw-Objekte bleiben dauerhaft
+// in APP.smp.kw erhalten, auch für vergangene Wochen, daher reicht ein einfacher Volltext-Scan.
+var WOCHE_SEARCH='';
+function wocheSearchInput(v){WOCHE_SEARCH=v;var el=document.getElementById('w-search-results');if(el)el.innerHTML=wocheSearchResults();}
+function wocheSearchResults(){
+if(!WOCHE_SEARCH.trim())return'';
+var q=WOCHE_SEARCH.trim().toLowerCase();
+var s=smpDB(),matches=[];
+for(var i=0;i<s.kw.length;i++){
+var kwo=s.kw[i];
+for(var d=0;d<7;d++){
+var arr=kwo.tage[d];if(!arr)continue;
+for(var j=0;j<arr.length;j++){
+var t=arr[j];
+if((t.text||'').toLowerCase().indexOf(q)>=0||(t.kat||'').toLowerCase().indexOf(q)>=0)matches.push({kw:kwo,day:d,task:t});
+}
+}
+}
+matches.sort(function(a,b){return wdays(b.kw.week,b.kw.year)[b.day]-wdays(a.kw.week,a.kw.year)[a.day];});
+if(!matches.length)return'<div class="empty" style="padding:14px"><p>Keine Treffer.</p></div>';
+return matches.slice(0,100).map(function(m){
+var dt=wdays(m.kw.week,m.kw.year)[m.day];
+return '<div class="ri" style="cursor:pointer" onclick="jumpToWocheTask('+m.kw.week+','+m.kw.year+','+m.day+')">'
++(m.task.kat?'<span class="zt-proj" style="margin-right:2px">'+esc(m.task.kat)+'</span>':'')
++(m.task.prioritaet?'<div class="dot" style="background:'+(PC[m.task.prioritaet]||'#888')+';"></div>':'')
++'<span class="rt'+(m.task.done?' dn':'')+'" style="flex:1">'+esc(m.task.text)+'</span>'
++'<span class="txs cm" style="white-space:nowrap">'+DS[m.day]+' '+fmt(dt)+' &middot; KW'+m.kw.week+'/'+m.kw.year+'</span>'
++'</div>';
+}).join('');
+}
+function jumpToWocheTask(w,y,d){PW2=w;PY=y;PD=d;WOCHE_SEARCH='';nav('woche');}
 function wNotiz(ta){
 var kw=getKW(PW2,PY);
 if(!kw.notizen)kw.notizen={};
