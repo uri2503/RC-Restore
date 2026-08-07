@@ -5579,6 +5579,7 @@ function kundenFind(name){
   if(!name)return null;
   var nl=name.toLowerCase();
   for(var i=0;i<kunden.length;i++){
+    if(!kunden[i]||!kunden[i].name)continue;
     if(kunden[i].name.toLowerCase()===nl) return kunden[i];
     if(kunden[i].name.toLowerCase().indexOf(nl)>=0) return kunden[i];
   }
@@ -5607,7 +5608,7 @@ function kundenSaveFromDok(){
   // Check if exists
   var existing=null;
   for(var i=0;i<db.kunden.length;i++){
-    if(db.kunden[i].name.toLowerCase()===name.toLowerCase()){existing=db.kunden[i];break;}
+    if((db.kunden[i].name||"").toLowerCase()===name.toLowerCase()){existing=db.kunden[i];break;}
   }
   if(existing){
     existing.adresse=adresse||existing.adresse;
@@ -5694,7 +5695,7 @@ function _kundenSuggest(val){
   if(!el)return;
   if(!val||val.length<2){el.style.display="none";return;}
   var vl=val.toLowerCase();
-  var matches=kunden.filter(function(k){return k.name.toLowerCase().indexOf(vl)>=0;});
+  var matches=kunden.filter(function(k){return k&&k.name&&k.name.toLowerCase().indexOf(vl)>=0;});
   if(matches.length===0){el.style.display="none";return;}
   var html="";
   for(var i=0;i<Math.min(matches.length,5);i++){
@@ -5805,7 +5806,7 @@ function dokSave(){
   if(DOK_NEW.kunde){
     var db2=docsDB();if(!db2.kunden)db2.kunden=[];
     var kExists=false;
-    for(var ki=0;ki<db2.kunden.length;ki++){if(db2.kunden[ki].name.toLowerCase()===DOK_NEW.kunde.toLowerCase()){kExists=true;break;}}
+    for(var ki=0;ki<db2.kunden.length;ki++){if((db2.kunden[ki].name||"").toLowerCase()===DOK_NEW.kunde.toLowerCase()){kExists=true;break;}}
     if(!kExists&&DOK_NEW.kunde){
       db2.kunden.push({id:"k"+Date.now(),name:DOK_NEW.kunde,adresse:DOK_NEW.adresse||"",fahrzeug:DOK_NEW.fahrzeug||"",created:new Date().toISOString().slice(0,10)});
     }
