@@ -5517,23 +5517,23 @@ function rRCDev(){
 var DOK_FILTER="alle", DOK_NEW=null, DOK_EDIT_ID=null;
 function docsDB(){
   smpDB();
-  if(!APP.smp.docs)APP.smp.docs={
-    dokumente:[],
-    vorlagen:[
+  if(!APP.smp.docs)APP.smp.docs={};
+  var d=APP.smp.docs;
+  if(!d.dokumente)d.dokumente=[];
+  if(!d.vorlagen)d.vorlagen=[
       {id:"v1",name:"Trockeneinstrahlen + Versiegelung",positionen:[{typ:"arbeit",bez:"Fahrzeug reinigen und entfetten",std:2,satz:109},{typ:"arbeit",bez:"Trockeneinstrahlen (Hohlr\u00e4ume)",std:3,satz:109},{typ:"arbeit",bez:"Versiegelung auftragen",std:2,satz:109},{typ:"arbeit",bez:"Qualit\u00e4tskontrolle",std:1,satz:109}]},
       {id:"v2",name:"Hauptuntersuchung Vorbereitung",positionen:[{typ:"arbeit",bez:"Fahrzeugcheck und M\u00e4ngelliste",std:1,satz:109},{typ:"arbeit",bez:"Beleuchtung pr\u00fcfen",std:0.5,satz:109},{typ:"arbeit",bez:"Bremsen pr\u00fcfen",std:1,satz:109}]},
       {id:"v3",name:"Einlagerung Winterpause",positionen:[{typ:"arbeit",bez:"Fahrzeug reinigen innen/au\u00dfen",std:2,satz:109},{typ:"arbeit",bez:"Konservierung Karosserie",std:1,satz:109},{typ:"arbeit",bez:"Reifenwechsel und Einlagerung",std:1,satz:109}]}
-    ],
-    nextNr:{angebot:1,rechnung:1},
-    textbausteine:[
+    ];
+  if(!d.nextNr)d.nextNr={angebot:1,rechnung:1};
+  if(!d.textbausteine)d.textbausteine=[
       {id:"t1",name:"Gew\u00e4hrleistung",text:"Wir gew\u00e4hren auf unsere Arbeiten eine Gew\u00e4hrleistung von 12 Monaten gem\u00e4\u00df gesetzlicher Vorschriften."},
       {id:"t2",name:"Zahlungsbedingungen",text:"Zahlbar innerhalb von 14 Tagen nach Rechnungsdatum ohne Abzug. Bei Zahlung innerhalb von 7 Tagen gew\u00e4hren wir 2% Skonto."},
       {id:"t3",name:"Danksagung",text:"Wir bedanken uns f\u00fcr Ihr Vertrauen und freuen uns auf eine weitere Zusammenarbeit."},
       {id:"t4",name:"Auftragsannahme",text:"Vielen Dank f\u00fcr Ihren Auftrag. Wir werden die Arbeiten termingerecht ausf\u00fchren und Sie \u00fcber den Fortschritt informieren."}
-    ],
-    kunden:[]
-  };
-  return APP.smp.docs;
+    ];
+  if(!d.kunden)d.kunden=[];
+  return d;
 }
 function docsSave(){saveDB();}
 function docStatusLabel(s){return s==="angebot"?"Angebot":s==="auftrag"?"Auftrag":s==="rechnung"?"Rechnung":s==="bezahlt"?"Bezahlt":"Storno";}
