@@ -6053,8 +6053,8 @@ function dokPrint(id){
   }
 
   // ── Build Arbeit rows (with optional category groups) ────────
-  var sumArb=0,sumMat=0,sumPaus=0;
-  for(var i=0;i<arbPos.length;i++) sumArb+=agNum(arbPos[i].std)*agNum(arbPos[i].satz||109);
+  var sumArb=0,sumArbStd=0,sumMat=0,sumPaus=0;
+  for(var i=0;i<arbPos.length;i++){sumArb+=agNum(arbPos[i].std)*agNum(arbPos[i].satz||109);sumArbStd+=agNum(arbPos[i].std);}
   for(var i=0;i<matPos.length;i++){var vk=agNum(matPos[i].ek)*(1+agNum(matPos[i].auf||0)/100);sumMat+=vk*agNum(matPos[i].menge||1);}
   for(var i=0;i<pausPos.length;i++) sumPaus+=agNum(pausPos[i].preis);
 
@@ -6062,23 +6062,23 @@ function dokPrint(id){
 
   var arbRows="";
   if(gruppe==="kategorie-zs"){
-    var curKat="",katSum=0;
+    var curKat="",katSum=0,katStd=0;
     for(var i=0;i<arbPos.length;i++){
       var p=arbPos[i],kat=getKat(p.bez),bet=agNum(p.std)*agNum(p.satz||109);
       // New category → emit subtotal for previous
       if(kat!==curKat){
         if(curKat&&katSum>0){
-          arbRows+="<tr style=\"background:#f5f5f5\"><td colspan=\"3\" style=\"font-weight:600;font-style:italic;font-size:10px;padding:4px 10px\">Zwischensumme "+esc(curKat)+"</td><td style=\"text-align:right;font-weight:700;padding:4px 10px\">"+agFmt(katSum)+" \u20ac</td></tr>";
-          katSum=0;
+          arbRows+="<tr style=\"background:#f5f5f5\"><td style=\"font-weight:600;font-style:italic;font-size:10px;padding:4px 10px\">Zwischensumme "+esc(curKat)+"</td><td style=\"text-align:right;font-weight:700;font-size:10px;white-space:nowrap;padding:4px 10px\">"+katStd.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td></td><td style=\"text-align:right;font-weight:700;padding:4px 10px\">"+agFmt(katSum)+" \u20ac</td></tr>";
+          katSum=0;katStd=0;
         }
         arbRows+="<tr><td colspan=\"4\" style=\"background:#f9f9f9;padding:5px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;border-top:2px solid #eee\">"+esc(kat)+"</td></tr>";
         curKat=kat;
       }
       arbRows+="<tr><td>"+esc(p.bez||"")+detHtml(p)+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
-      katSum+=bet;
+      katSum+=bet;katStd+=agNum(p.std);
     }
     if(curKat&&katSum>0){
-      arbRows+="<tr style=\"background:#f5f5f5\"><td colspan=\"3\" style=\"font-weight:600;font-style:italic;font-size:10px;padding:4px 10px\">Zwischensumme "+esc(curKat)+"</td><td style=\"text-align:right;font-weight:700;padding:4px 10px\">"+agFmt(katSum)+" \u20ac</td></tr>";
+      arbRows+="<tr style=\"background:#f5f5f5\"><td style=\"font-weight:600;font-style:italic;font-size:10px;padding:4px 10px\">Zwischensumme "+esc(curKat)+"</td><td style=\"text-align:right;font-weight:700;font-size:10px;white-space:nowrap;padding:4px 10px\">"+katStd.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td></td><td style=\"text-align:right;font-weight:700;padding:4px 10px\">"+agFmt(katSum)+" \u20ac</td></tr>";
     }
   } else if(gruppe==="kategorie"){
     var curKat2="";
@@ -6163,7 +6163,7 @@ function dokPrint(id){
   if(arbPos.length>0){
     html+="<div class=\"sec\">Arbeitsleistungen</div>";
     html+="<table><thead><tr><th>Bezeichnung</th><th class=\"r\" style=\"width:75px\">Stunden</th><th class=\"r\" style=\"width:90px\">Stundensatz</th><th class=\"r\" style=\"width:100px\">Betrag</th></tr></thead><tbody>"+arbRows+"</tbody>";
-    html+="<tfoot><tr class=\"zs\"><td colspan=\"3\">Zwischensumme Arbeitsleistungen</td><td style=\"text-align:right;font-weight:700\">"+agFmt(sumArb)+" \u20ac</td></tr></tfoot></table>";
+    html+="<tfoot><tr class=\"zs\"><td>Zwischensumme Arbeitsleistungen</td><td style=\"text-align:right;font-weight:700;white-space:nowrap\">"+sumArbStd.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td></td><td style=\"text-align:right;font-weight:700\">"+agFmt(sumArb)+" \u20ac</td></tr></tfoot></table>";
   }
   if(matPos.length>0){
     html+="<div class=\"sec\">Material &amp; Ersatzteile</div>";
