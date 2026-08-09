@@ -5769,14 +5769,6 @@ function dokFromProjekt(){
   var ze=proj?getSMPTimeForProject(proj):getSMPTime(projName);
   for(var i=0;i<ze.length;i++){var e=ze[i];var bez=(e.note||"").replace(/\[[^\]]+\]$/,"").trim()||"Arbeitszeit";DOK_NEW.positionen.push({typ:"arbeit",bez:bez+(e.date?" ("+e.date+")":""),std:Math.round((e.dur||0)/3600000*10)/10,satz:agNum(e.rate)||109});added++;}
   if(proj){for(var j=0;j<(proj.teile||[]).length;j++){var t=proj.teile[j];DOK_NEW.positionen.push({typ:"material",bez:t.bezeichnung||t.name||"Ersatzteil",nr:t.nr||"",ek:agNum(t.preis||t.ek)||0,auf:30,menge:agNum(t.menge)||1});added++;}if(proj.fahrzeug&&!DOK_NEW.fahrzeug)DOK_NEW.fahrzeug=proj.fahrzeug;}
-  // TEMP-DIAGNOSE: hilft nachzuvollziehen, warum manche SMP-Zeiten nicht gefunden werden \u2014
-  // kann nach Kl\u00e4rung des Bugs wieder entfernt werden.
-  var dbgLink=proj?(proj.smpProj||"(leer)"):"(kein Projekt gefunden)";
-  var dbgPidMatches=proj&&proj.id?(APP.smp.zeit||[]).filter(function(e){return e.pid===proj.id;}).length:0;
-  var dbgNameMatches=proj?getSMPTime(proj.smpProj||proj.name).length:0;
-  var dbgTotal=(APP.smp.zeit||[]).length;
-  var dbg="[DIAG "+new Date().toLocaleTimeString("de-DE")+"] Projekt=\""+projName+"\" gefunden="+(!!proj)+" proj.id="+(proj?proj.id:"-")+" proj.smpProj=\""+dbgLink+"\" | Zeit gesamt="+dbgTotal+" pid-Treffer="+dbgPidMatches+" Name-Treffer="+dbgNameMatches+" kombiniert="+ze.length;
-  DOK_NEW.notiz=(DOK_NEW.notiz?DOK_NEW.notiz+"\n":"")+dbg;
   toast(added+" Positionen geladen","ok");_refreshDok();
 }
 function dokNeuWizard(){DOK_NEW={id:"dok_"+Date.now(),nr:"",status:"angebot",datum:new Date().toISOString().slice(0,10),kunde:"",adresse:"",projekt:"",fahrzeug:"",positionen:[],notiz:"",mitMwst:false,mwstSatz:19,zahlungsziel:14};DOK_EDIT_ID=null;_refreshDok();}
