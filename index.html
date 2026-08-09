@@ -5847,6 +5847,8 @@ function _rDokForm(dok,isEdit){
     posR+="</div>";
     // Bezeichnung - full width
     posR+="<input value=\""+esc(p.bez||"")+"\" onchange=\"dokUpdPos("+i+",&quot;bez&quot;,this.value)\" placeholder=\"Bezeichnung\" style=\"width:100%;padding:6px 8px;border:1px solid var(--border);background:var(--bg);font-size:13px;font-weight:600;margin-bottom:8px\">";
+    // Detailbeschreibung - freies Textfeld für Arbeitsgang-Details
+    posR+="<textarea onchange=\"dokUpdPos("+i+",&quot;detail&quot;,this.value)\" placeholder=\"Detailbeschreibung (optional, z.B. genauer Arbeitsgang)\" style=\"width:100%;min-height:44px;resize:vertical;padding:6px 8px;border:1px solid var(--border);background:var(--bg);font-size:12px;margin-bottom:8px\">"+esc(p.detail||"")+"</textarea>";
     // Detail inputs depending on type
     if(p.typ==="arbeit"){
       posR+="<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px\">";
@@ -6017,6 +6019,8 @@ function dokPrint(id){
   for(var i=0;i<matPos.length;i++){var vk=agNum(matPos[i].ek)*(1+agNum(matPos[i].auf||0)/100);sumMat+=vk*agNum(matPos[i].menge||1);}
   for(var i=0;i<pausPos.length;i++) sumPaus+=agNum(pausPos[i].preis);
 
+  function detHtml(p){return p.detail?"<br><span style=\"font-size:10px;color:#888;white-space:pre-line\">"+esc(p.detail)+"</span>":"";}
+
   var arbRows="";
   if(gruppe==="kategorie-zs"){
     var curKat="",katSum=0;
@@ -6031,7 +6035,7 @@ function dokPrint(id){
         arbRows+="<tr><td colspan=\"4\" style=\"background:#f9f9f9;padding:5px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;border-top:2px solid #eee\">"+esc(kat)+"</td></tr>";
         curKat=kat;
       }
-      arbRows+="<tr><td>"+esc(p.bez||"")+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
+      arbRows+="<tr><td>"+esc(p.bez||"")+detHtml(p)+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
       katSum+=bet;
     }
     if(curKat&&katSum>0){
@@ -6045,32 +6049,33 @@ function dokPrint(id){
         arbRows+="<tr><td colspan=\"4\" style=\"background:#f9f9f9;padding:5px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;border-top:2px solid #eee\">"+esc(kat)+"</td></tr>";
         curKat2=kat;
       }
-      arbRows+="<tr><td>"+esc(p.bez||"")+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
+      arbRows+="<tr><td>"+esc(p.bez||"")+detHtml(p)+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
     }
   } else {
     for(var i=0;i<arbPos.length;i++){
       var p=arbPos[i],bet=agNum(p.std)*agNum(p.satz||109);
-      arbRows+="<tr><td>"+esc(p.bez||"")+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
+      arbRows+="<tr><td>"+esc(p.bez||"")+detHtml(p)+"</td><td style=\"text-align:right;white-space:nowrap;width:75px\">"+agNum(p.std).toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})+" h</td><td style=\"text-align:right;width:90px\">"+agFmt(agNum(p.satz||109))+" \u20ac/h</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
     }
   }
 
   var matRows="";
   for(var i=0;i<matPos.length;i++){
     var p=matPos[i],vk=agNum(p.ek)*(1+agNum(p.auf||0)/100),bet=vk*agNum(p.menge||1);
-    var det=(p.nr?"<br><span style=\"font-size:10px;color:#888;font-family:monospace\">"+esc(p.nr)+"</span>":"");
+    var det=(p.nr?"<br><span style=\"font-size:10px;color:#888;font-family:monospace\">"+esc(p.nr)+"</span>":"")+detHtml(p);
     matRows+="<tr><td>"+esc(p.bez||"")+det+"</td><td style=\"text-align:right;width:60px\">"+(agNum(p.menge)||1)+" Stk.</td><td style=\"text-align:right;width:90px\">"+agFmt(vk)+" \u20ac</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(bet)+" \u20ac</td></tr>";
   }
 
   var pausRows="";
   for(var i=0;i<pausPos.length;i++){
     var p=pausPos[i];
-    pausRows+="<tr><td colspan=\"3\">"+esc(p.bez||"")+"</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(agNum(p.preis))+" \u20ac</td></tr>";
+    pausRows+="<tr><td colspan=\"3\">"+esc(p.bez||"")+detHtml(p)+"</td><td style=\"text-align:right;width:100px;font-weight:600\">"+agFmt(agNum(p.preis))+" \u20ac</td></tr>";
   }
 
-  var css="*{box-sizing:border-box;margin:0;padding:0}body{font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#1a1a1a;padding:28px}table{width:100%;border-collapse:collapse;margin-bottom:4px}th{background:#f5f5f5;padding:6px 10px;text-align:left;border-bottom:2px solid #ddd;font-size:10px;text-transform:uppercase;letter-spacing:1px}td{padding:6px 10px;border-bottom:1px solid #eee}.tot{font-weight:700;background:#f5f5f5}.zs{font-weight:700;background:#f0f0f0;border-top:2px solid #ddd}.sec{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700}.grand{font-size:14px;font-weight:800;color:#c41230;border-top:3px solid #c41230;padding-top:10px;margin-top:4px}td.r{text-align:right}th.r{text-align:right}@media print{@page{margin:15mm}body{padding:0}}";
+  var css="*{box-sizing:border-box;margin:0;padding:0}body{font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#1a1a1a;padding:28px}table{width:100%;border-collapse:collapse;margin-bottom:4px}th{background:#f5f5f5;padding:6px 10px;text-align:left;border-bottom:2px solid #ddd;font-size:10px;text-transform:uppercase;letter-spacing:1px}td{padding:6px 10px;border-bottom:1px solid #eee}.tot{font-weight:700;background:#f5f5f5}.zs{font-weight:700;background:#f0f0f0;border-top:2px solid #ddd}.sec{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;padding:14px 0 5px;font-weight:700}.grand{font-size:14px;font-weight:800;color:#c41230;border-top:3px solid #c41230;padding-top:10px;margin-top:4px}td.r{text-align:right}th.r{text-align:right}.toolbar{position:sticky;top:0;background:#1a1715;padding:10px 16px;display:flex;gap:10px;align-items:center;margin:-28px -28px 20px -28px}.toolbar button{border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-weight:700;font-size:12px}.toolbar .b-print{background:#c41230;color:#fff}.toolbar .b-back{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3)}@media print{@page{margin:15mm}body{padding:0}.toolbar{display:none}}";
 
   var w=window.open("","_blank","width=950,height=1100");
   var html="<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"UTF-8\"><title>"+typ+" "+nr+"</title><style>"+css+"</style></head><body>";
+  html+="<div class=\"toolbar\"><button class=\"b-print\" onclick=\"window.print()\">\u{1F5A8} Drucken</button><button class=\"b-back\" onclick=\"window.close()\">← Zurück</button></div>";
 
   // ── HEADER ───────────────────────────────────────────────────
   html+="<div style=\"display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid #c41230;margin-bottom:20px\">";
